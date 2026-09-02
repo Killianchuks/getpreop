@@ -37,6 +37,13 @@ body {
   min-height: 64px;
   position: relative;
   z-index: 1;
+  visibility: visible;
+  opacity: 1;
+}
+
+.site-header-content > * {
+  visibility: visible;
+  opacity: 1;
 }
 
 main {
