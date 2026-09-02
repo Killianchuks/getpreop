@@ -22,8 +22,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-slate-50 text-slate-900 antialiased">
-        <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
-          <div className="flex w-full items-center justify-between px-5 py-3.5 sm:px-8 lg:px-10">
+        <header className="site-header sticky top-0 z-50 border-b border-slate-200 bg-white">
+          <div className="site-header-content flex w-full items-center justify-between px-5 py-3.5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
               <DashboardHomeLink brand />
               {appMode ? (
