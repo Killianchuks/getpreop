@@ -74,6 +74,10 @@ body {
   white-space: nowrap;
 }
 
+.mobile-navigation {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .site-header-content {
     gap: 1rem;
@@ -88,16 +92,32 @@ body {
 
 @media (max-width: 760px) {
   .site-header-content {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    min-height: 76px;
+    padding: 1rem 2.2rem;
   }
 
-  .site-header-nav {
-    order: 3;
-    justify-content: flex-start;
-    flex-basis: 100%;
-    overflow-x: auto;
-    padding-bottom: 0.2rem;
+  .site-header-nav,
+  .site-header-actions {
+    display: none;
+  }
+
+  .mobile-navigation {
+    display: block;
+    position: relative;
+  }
+
+  .mobile-navigation-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.75rem);
+    width: min(360px, calc(100vw - 2.5rem));
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    padding: 0.75rem;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
   }
 }
 

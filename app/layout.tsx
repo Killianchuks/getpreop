@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthNavigation } from "@/components/auth-navigation";
+import { MobileNavigation } from "@/components/mobile-navigation";
 import { PartnerNavigation } from "@/components/partner-navigation";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default function RootLayout({
             <div className="site-header-actions">
               <AuthNavigation />
             </div>
+            <MobileNavigation />
           </div>
         </header>
         {children}
