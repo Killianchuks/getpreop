@@ -1,0 +1,52 @@
+{
+  "name": "getpreop",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "dev:test": "dotenv -e .env.test -- next dev --hostname 0.0.0.0 --port 3001",
+    "build": "next build",
+    "build:test": "dotenv -e .env.test -- next build",
+    "start": "next start",
+    "start:local-domain": "next start --hostname 0.0.0.0 --port 3000",
+    "start:test": "dotenv -e .env.test -- next start --hostname 0.0.0.0 --port 3001",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true,
+  "description": "Virtual anesthesiology-led preoperative assessment and optimization platform.",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@types/pg": "^8.20.4",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.38.0",
+    "next": "^16.3.0",
+    "nodemailer": "^9.0.5",
+    "pg": "^8.22.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "stripe": "^22.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "autoprefixer": "^10.5.4",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.0",
+    "postcss": "^8.5.25",
+    "prisma": "^7.9.1",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
+    "typescript": "^6.0.3"
+  }
+}

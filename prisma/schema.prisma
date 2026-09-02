@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PATIENT
+  SURGERY_CENTER
+  ANESTHESIOLOGIST
+  ADMIN
+}
+
+enum SexAtBirth {
+  MALE
+  FEMALE
+  INTERSEX
+  UNDISCLOSED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum TeleconsultationStatus {
+  REQUESTED
+  SCHEDULED
+  COMPLETED
+  CANCELED
+}
+
+enum ReadinessLevel {
+  NOT_READY
+  OPTIMIZING
+  READY
+}
+
+model User {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  fullName       String
+  passwordHash   String?
+  role           Role
+  surgeryCenterId String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  surgeryCenter  SurgeryCenter?     @relation(fields: [surgeryCenterId], references: [id], onDelete: SetNull)
+  patientProfile PatientProfile?
+  anesthesiologistProfile AnesthesiologistProfile?
+  consultations  Teleconsultation[] @relation("ConsultantBookings")
+}
+
+model PatientProfile {
+  id                     String                 @id @default(cuid())
+  userId                 String                 @unique
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth            DateTime
+  sexAtBirth             SexAtBirth
+  phone                  String?
+  languagePreference     String?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  surgeryCases           SurgeryCase[]
+  questionnaireResponses QuestionnaireResponse[]
+  riskAssessments        RiskAssessment[]
+  optimizationTasks      OptimizationTask[]
+  teleconsultations      Teleconsultation[]
+  readinessStatuses      ReadinessStatus[]
+  referrals              Referral[]
+  reports                PreopReport[]
+  secureMessages         SecureMessage[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+}
+
+model SurgeryCase {
+  id                 String             @id @default(cuid())
+  patientProfileId   String
+  referralId         String?
+  patientProfile     PatientProfile     @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  referral           Referral?          @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  procedureName      String
+  plannedDate        DateTime
+  facilityName       String
+  surgeonName        String?
+  anesthesiaType     String?
+  cancellationRisk   Float?
+  readinessSummaries ReadinessStatus[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model SurgeryCenter {
+  id          String     @id @default(cuid())
+  externalId  String     @unique
+  name        String
+  users       User[]
+  referrals   Referral[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Referral {
+  id                String         @id @default(cuid())
+  surgeryCenterId   String
+  surgeryCenter     SurgeryCenter  @relation(fields: [surgeryCenterId], references: [id], onDelete: Cascade)
+  patientProfileId  String?
+  patientProfile    PatientProfile? @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  patientFullName   String
+  patientEmail      String
+  procedureName     String
+  scheduledDate     DateTime
+  priority          String
+  status            String          @default("received")
+  reportTurnaroundHours Int
+  surgeryCases      SurgeryCase[]
+  reports           PreopReport[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model AnesthesiologistProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber     String
+  licenseRegion     String
+  verified          Boolean  @default(false)
+  verificationDate  DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model SecureMessage {
+  id               String         @id @default(cuid())
+  conversationId   String
+  patientProfileId String?
+  patientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  senderRole       String
+  message          String
+  createdAt        DateTime       @default(now())
+}
+
+model PreopReport {
+  id                  String          @id @default(cuid())
+  referralId          String?
+  referral            Referral?       @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  patientProfileId    String?
+  patientProfile      PatientProfile? @relation(fields: [patientProfileId], references: [id], onDelete: SetNull)
+  surgeryCaseId       String?
+  patientFullName     String
+  procedureName       String
+  surgeryDate         DateTime
+  readinessLevel      String
+  asaClass            String
+  cancellationRisk    Float
+  safetyRisk          Float
+  medicationInstructions String[]
+  specialistRecommendations String[]
+  summary             String
+  turnaroundHours     Int
+  createdAt           DateTime        @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String?
+  actorRole   String?
+  details     Json?
+  createdAt   DateTime @default(now())
+}
+
+model QuestionnaireResponse {
+  id               String         @id @default(cuid())
+  patientProfileId String
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  surgeryCaseId    String?
+  payload          Json
+  submittedAt      DateTime       @default(now())
+}
+
+model RiskAssessment {
+  id               String         @id @default(cuid())
+  patientProfileId String
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  surgeryCaseId    String?
+  asaClass         String
+  cancellationRisk Float
+  factors          String[]
+  generatedAt      DateTime       @default(now())
+}
+
+model OptimizationTask {
+  id               String         @id @default(cuid())
+  patientProfileId String
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  surgeryCaseId    String?
+  title            String
+  description      String
+  ownerDiscipline  String
+  dueDate          DateTime?
+  status           TaskStatus     @default(PENDING)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Teleconsultation {
+  id               String                @id @default(cuid())
+  patientProfileId String
+  patientProfile   PatientProfile        @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  consultantId     String?
+  consultant       User?                 @relation("ConsultantBookings", fields: [consultantId], references: [id], onDelete: SetNull)
+  scheduledStart   DateTime
+  scheduledEnd     DateTime
+  meetingUrl       String?
+  status           TeleconsultationStatus @default(REQUESTED)
+  notes            String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+}
+
+model ReadinessStatus {
+  id               String         @id @default(cuid())
+  patientProfileId String
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  surgeryCaseId    String?
+  surgeryCase      SurgeryCase?   @relation(fields: [surgeryCaseId], references: [id], onDelete: SetNull)
+  level            ReadinessLevel
+  summary          String
+  blockers         String[]
+  decidedAt        DateTime       @default(now())
+}

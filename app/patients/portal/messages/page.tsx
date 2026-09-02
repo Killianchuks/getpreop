@@ -1,0 +1,12 @@
+"use client";
+
+import { Send } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+
+export default function PatientMessagesPage() {
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([{ sender: "Care team", text: "Your anesthesia assessment team is available for non-urgent questions.", time: "Today" }]);
+  function sendMessage(event: React.FormEvent) { event.preventDefault(); const text = message.trim(); if (!text) return; setMessages((items) => [...items, { sender: "You", text, time: "Just now" }]); setMessage(""); }
+  return <main className="w-full max-w-none p-0"><section className="mx-auto max-w-4xl px-5 py-8 sm:px-8 lg:px-10"><Link href="/patients/portal" className="text-xs font-semibold text-teal-800 hover:text-teal-950">Back to your pre-op plan</Link><div className="mt-6"><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-800">Secure messages</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">Your care team</h1><p className="mt-2 text-sm text-slate-500">For non-urgent questions about your preoperative assessment and instructions.</p></div><section className="mt-7 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="border-b border-slate-200 p-5"><p className="font-bold text-slate-900">GetPreOp care team</p><p className="mt-1 text-xs text-slate-500">Messages are reviewed during normal care hours.</p></div><div className="min-h-[280px] space-y-4 bg-slate-50 p-5">{messages.map((item, index) => <div key={`${item.time}-${index}`} className={`max-w-md rounded-lg p-4 text-sm ${item.sender === "You" ? "ml-auto bg-teal-800 text-white" : "bg-white text-slate-700 shadow-sm"}`}><p className={`text-xs font-bold ${item.sender === "You" ? "text-teal-100" : "text-teal-800"}`}>{item.sender}</p><p className="mt-1 leading-6">{item.text}</p><p className={`mt-2 text-[11px] ${item.sender === "You" ? "text-teal-100" : "text-slate-400"}`}>{item.time}</p></div>)}</div><form onSubmit={sendMessage} className="flex gap-3 border-t border-slate-200 p-4"><input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write a non-urgent question" className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-teal-700" /><button type="submit" className="flex items-center gap-2 rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-900"><Send size={16} /> Send</button></form></section></section></main>;
+}
