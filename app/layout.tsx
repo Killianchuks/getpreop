@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthNavigation } from "@/components/auth-navigation";
+import { PartnerNavigation } from "@/components/partner-navigation";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
@@ -37,14 +39,13 @@ export default function RootLayout({
               <Link href="/" className="hover:text-teal-800 transition">Home</Link>
               <Link href="/why-getpreop" className="hover:text-teal-800 transition">Why GetPreOp</Link>
               <Link href="/who-we-serve" className="hover:text-teal-800 transition">Who We Serve</Link>
-              <Link href="/how-we-partner" className="hover:text-teal-800 transition">How We Partner</Link>
+              <PartnerNavigation />
               <Link href="/what-we-offer" className="hover:text-teal-800 transition">What We Offer</Link>
               <Link href="/about" className="hover:text-teal-800 transition">About Us</Link>
             </nav>
 
             <div className="site-header-actions">
-              <Link href="/login" className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-teal-400 hover:text-teal-800">Login</Link>
-              <Link href="/signup" className="rounded-lg bg-teal-800 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-900">Sign Up</Link>
+              <AuthNavigation />
             </div>
           </div>
         </header>
