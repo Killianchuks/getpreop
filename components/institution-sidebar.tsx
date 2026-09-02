@@ -31,7 +31,7 @@ export function InstitutionSidebar({
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6">
-      <Link href="/" className="flex items-center gap-2 px-2">
+      <Link href="/surgery-centers/dashboard" className="flex items-center gap-2 px-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-800 text-sm font-bold text-white">
           G
         </span>

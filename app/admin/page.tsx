@@ -87,7 +87,7 @@ export default function AdminPage() {
     <main className="w-full max-w-none p-0">
       <div className="mx-auto flex min-h-[calc(100vh-65px)] max-w-[1440px] bg-slate-50">
         <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-4 py-6 lg:flex">
-          <Link href="/" className="flex items-center gap-3 px-2">
+          <Link href="/admin" className="flex items-center gap-3 px-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-800 text-sm font-bold text-white">G</span>
             <span><span className="block text-lg font-bold tracking-tight text-slate-900">GetPreOp</span><span className="block text-[11px] font-medium text-slate-500">Platform operations</span></span>
           </Link>
