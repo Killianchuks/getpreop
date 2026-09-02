@@ -4,8 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:test": "dotenv -e .env.test -- next dev --hostname 0.0.0.0 --port 3001",
-    "build": "next build",
-    "build:test": "dotenv -e .env.test -- next build",
+    "build": "prisma generate && next build",
+    "build:test": "dotenv -e .env.test -- prisma generate && next build",
     "start": "next start",
     "start:local-domain": "next start --hostname 0.0.0.0 --port 3000",
     "start:test": "dotenv -e .env.test -- next start --hostname 0.0.0.0 --port 3001",
