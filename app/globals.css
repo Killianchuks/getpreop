@@ -28,15 +28,22 @@ body {
 .site-header {
   display: block;
   min-height: 65px;
-  isolation: isolate;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
+  position: relative;
+  z-index: 50;
+  width: 100%;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
 }
 
 .site-header-content {
   min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  width: 100%;
+  padding: 0.875rem 2.5rem;
   position: relative;
-  z-index: 1;
   visibility: visible;
   opacity: 1;
 }
@@ -44,6 +51,54 @@ body {
 .site-header-content > * {
   visibility: visible;
   opacity: 1;
+}
+
+.site-header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.75rem;
+  flex: 1;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.site-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .site-header-content {
+    gap: 1rem;
+    padding-inline: 1.25rem;
+  }
+
+  .site-header-nav {
+    gap: 0.8rem;
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .site-header-content {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .site-header-nav {
+    order: 3;
+    justify-content: flex-start;
+    flex-basis: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
 }
 
 main {
