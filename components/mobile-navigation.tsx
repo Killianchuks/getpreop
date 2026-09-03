@@ -6,13 +6,11 @@ import { useState } from "react";
 
 const primaryLinks = [
   ["Home", "/"],
-  ["Why GetPreOp", "/why-getpreop"],
-  ["Who We Serve", "/who-we-serve"],
-  ["How We Partner", "/how-we-partner"],
-  ["For Institutions", "/how-we-partner/institutions"],
-  ["For Clinicians", "/how-we-partner/clinicians"],
-  ["What We Offer", "/what-we-offer"],
-  ["About Us", "/about"],
+  ["Work", "/#work"],
+  ["Collaborate", "/#collaborate"],
+  ["About", "/about"],
+  ["Contact", "/contact"],
+  ["GetPreOp Platform", "/what-we-offer"],
 ] as const;
 
 const roles = [
