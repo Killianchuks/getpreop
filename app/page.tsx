@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { RolePicker } from "@/components/role-picker";
-import { PortfolioHomeV2 } from "@/components/portfolio-home-v2";
 
 const outcomes = [
   ["Assess before surgery day", "Digital intake, records, and anesthesia review bring risk forward."],
@@ -8,7 +7,7 @@ const outcomes = [
   ["Give every team a clear report", "A concise clinical plan arrives when the care team can still act."],
 ];
 
-function LegacyHome() {
+export default function Home() {
   return <main className="w-full max-w-none p-0">
     <section className="border-b border-slate-200 bg-white"><div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[1.03fr_0.97fr] lg:px-10 lg:py-20"><div className="flex flex-col justify-center"><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-800">Anesthesia-led preoperative readiness</p><h1 className="mt-4 max-w-2xl text-4xl font-bold leading-tight tracking-tight text-slate-950 sm:text-5xl">A more prepared path to every procedure.</h1><p className="mt-5 max-w-xl text-base leading-7 text-slate-600">GetPreOp unites surgical facilities, credentialed anesthesiologists, and patients around the work that determines readiness before surgery day.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/institutions" className="rounded-lg bg-teal-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-900">For surgical facilities</Link><Link href="/anesthesiologists" className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">For anesthesiologists</Link></div><p className="mt-5 text-xs text-slate-500">Structured intake. Anesthesia-led assessment. Clear readiness reporting.</p></div><div className="relative overflow-hidden rounded-lg bg-slate-900 shadow-sm"><img src="https://images.unsplash.com/photo-1584982751601-97dcc096659c?auto=format&fit=crop&w=1400&q=85" alt="Surgical care team preparing together" className="h-full min-h-[400px] w-full object-cover opacity-85" /><div className="absolute bottom-5 left-5 right-5 rounded-lg border border-white/20 bg-slate-950/85 p-5 text-white backdrop-blur-sm"><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-300">Readiness, made visible</p><p className="mt-2 text-lg font-bold">One coordinated workflow from referral to report delivery.</p></div></div></div></section>
     <section className="bg-slate-950 text-white"><div className="mx-auto grid max-w-7xl gap-5 px-5 py-8 sm:grid-cols-3 sm:px-8 lg:px-10"><div><p className="text-2xl font-bold">24-48h</p><p className="mt-1 text-sm text-slate-300">target report delivery window</p></div><div><p className="text-2xl font-bold">State-matched</p><p className="mt-1 text-sm text-slate-300">credentialed clinician routing</p></div><div><p className="text-2xl font-bold">One source</p><p className="mt-1 text-sm text-slate-300">of truth for every case</p></div></div></section>
@@ -17,8 +16,4 @@ function LegacyHome() {
     <section className="bg-teal-800 py-16 text-white"><div className="mx-auto max-w-7xl px-5 sm:flex sm:items-end sm:justify-between sm:gap-8 sm:px-8 lg:px-10"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-100">Start with your role</p><h2 className="mt-3 text-3xl font-bold tracking-tight">Ready to make pre-op readiness easier to run?</h2><p className="mt-3 text-sm leading-6 text-teal-50">Join GetPreOp to bring early assessment, clinical accountability, and clearer communication to every scheduled case.</p></div><Link href="/signup" className="mt-6 inline-block shrink-0 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-teal-900 transition hover:bg-teal-50 sm:mt-0">Create an account</Link></div></section>
     <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 lg:px-10"><RolePicker /></div>
   </main>;
-}
-
-export default function Home() {
-  return <PortfolioHomeV2 />;
 }
