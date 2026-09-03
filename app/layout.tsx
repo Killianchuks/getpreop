@@ -26,7 +26,7 @@ export default function RootLayout({
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 transition hover:text-teal-700">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-800 text-sm font-bold text-white">K</span>
-                <span>Killian Chukwuebuka</span>
+                <span>Killian Onwudiwe, PhD</span>
               </Link>
               {appMode ? (
                 <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold tracking-wider text-slate-700">
