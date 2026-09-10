@@ -22,16 +22,16 @@ const pricingTiers = [
     name: "Pay-As-You-Go",
     id: "per-case",
     tagline: "For variable volume centers & clinics testing virtual pre-op",
-    monthlyDisplay: "$339",
+    monthlyDisplay: "$350",
     monthlyPeriod: "/ completed case",
-    annualDisplay: "$310",
+    annualDisplay: "$350",
     annualPeriod: "/ completed case",
-    monthlySubtext: "$250 anesthesiologist fee + $89 platform fee • $0 monthly commitment",
-    annualSubtext: "$250 anesthesiologist fee + $60 platform fee (annual volume agreement)",
+    monthlySubtext: "$350 per completed case • no monthly commitment",
+    annualSubtext: "$350 per completed case • no monthly commitment",
     popular: false,
     badge: "On-Demand",
     features: [
-      "$250 board-certified anesthesiologist professional fee, paid per case",
+      "$350 per completed preoperative assessment",
       "Standard 10-minute digital health intake",
       "Automated clinical risk stratification",
       "24–48 hour standardized 1-page report SLA",
@@ -41,6 +41,7 @@ const pricingTiers = [
     ],
     ctaText: "Start Pay-As-You-Go",
   },
+  /* Recommended Standard ASC pricing is paused while bulk pricing is finalized.
   {
     name: "Standard ASC",
     id: "asc-growth",
@@ -64,7 +65,7 @@ const pricingTiers = [
       "Dedicated clinical support contact",
     ],
     ctaText: "Get Started with Standard",
-  },
+  }, */
   {
     name: "Enterprise Health System",
     id: "enterprise",
@@ -73,20 +74,20 @@ const pricingTiers = [
     monthlyPeriod: "/ month (Custom Volume Contract)",
     annualDisplay: "Custom",
     annualPeriod: "/ year (Enterprise Volume Contract)",
-    monthlySubtext: "$250 MD fee + platform fee scaling down to ~$12/case at 1,500+ cases/mo",
-    annualSubtext: "$250 MD fee + platform fee scaling down to ~$10/case at 1,500+ cases/mo",
+    monthlySubtext: "Custom bulk pricing for hospitals and high-volume systems",
+    annualSubtext: "Custom bulk pricing for hospitals and high-volume systems",
     popular: false,
     badge: "Multi-Facility",
     features: [
-      "Same $250 anesthesiologist fee at any volume — physician pay is never cut",
-      "Platform fee drops as low as ~$10–12/case at enterprise scale",
+      "Custom pricing designed around case volume and operating model",
+      "Dedicated discussion for hospitals and high-volume health systems",
       "Unlimited multi-facility network management",
       "Custom EHR integration (Epic, Cerner, MEDITECH)",
       "Custom clinical risk threshold & protocol calibration",
       "Dedicated Account Manager & clinical quality auditor",
       "Signed BAA & guaranteed 99.9% uptime SLA",
     ],
-    ctaText: "Request Enterprise Contract",
+    ctaText: "Discuss Bulk Pricing",
   },
 ];
 
@@ -181,7 +182,7 @@ const featureMatrix = [
   { feature: "Report Turnaround SLA", perCase: "24–48 Hours", standard: "Priority 24 Hours", enterprise: "Guaranteed Custom SLA" },
   { feature: "Anesthesiologist Professional Fee", perCase: "$250 / case", standard: "$250 / case", enterprise: "$250 / case" },
   { feature: "GetPreOp Platform Fee (per case)", perCase: "$89 (mo) / $60 (yr)", standard: "$35 (mo) / $15 (yr)", enterprise: "As low as $10–12" },
-  { feature: "Total Effective Rate", perCase: "$339 (mo) / $310 (yr)", standard: "$285 (mo) / $265 (yr)", enterprise: "As low as ~$260/case" },
+  { feature: "Total Effective Rate", perCase: "$350 / completed case", standard: "Contact us", enterprise: "Contact us" },
   { feature: "Facility Readiness Dashboard", perCase: "Basic", standard: "Advanced", enterprise: "Multi-Site Command Center" },
   { feature: "EHR Integration (Epic, Cerner, etc.)", perCase: "Manual PDF Export", standard: "EHR-Ready 1-Page PDF", enterprise: "Direct HL7 / FHIR API Integration" },
   { feature: "Cancellation Risk Analytics", perCase: "—", standard: "Monthly Summary", enterprise: "Real-Time Predictive Analytics" },
@@ -199,7 +200,7 @@ const faqs = [
   },
   {
     q: "How is the Standard ASC monthly price calculated?",
-    a: "$42,750/month covers 150 cases at $285/case ($250 anesthesiologist fee + $35 platform fee). Billed annually, the platform fee drops to $15/case ($265/case effective), for $39,750/month ($477,000/year) — a real $36,000/year savings on the portion GetPreOp controls.",
+    a: "The active public price is $350 per completed case. Hospitals and high-volume systems can contact GetPreOp to discuss a custom bulk arrangement based on volume and workflow.",
   },
   {
     q: "How does GetPreOp generate ROI for our surgical facility?",
@@ -569,7 +570,7 @@ export default function PricingPage() {
 
             <div className="pt-2 border-t border-slate-800">
               <Link
-                href={`/signup?role=SURGERY_CENTER&plan=${monthlyCases <= 150 ? "asc-growth" : "enterprise"}&billing=${annualBilling ? "annual" : "monthly"}`}
+                href="mailto:contact@getpreop.com?subject=Bulk pricing discussion"
                 className="block w-full rounded-lg bg-teal-600 py-3 text-center text-xs font-semibold text-white hover:bg-teal-500 transition shadow-xs"
               >
                 Protect Your Facility Revenue ({annualBilling ? "Annual Terms" : "Monthly Terms"})

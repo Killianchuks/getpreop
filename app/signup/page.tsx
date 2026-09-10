@@ -39,7 +39,7 @@ function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialRoleParam = searchParams.get("role");
-  const initialPlanParam = searchParams.get("plan") || "asc-growth";
+  const initialPlanParam = searchParams.get("plan") || "per-case";
   const initialBillingParam = searchParams.get("billing") || "annual";
 
   const [fullName, setFullName] = useState("");
@@ -192,15 +192,16 @@ function SignUpForm() {
                   </div>
                   <p className="font-bold text-sm text-white mt-2">Pay-As-You-Go</p>
                   <p className="text-[11px] text-slate-300 mt-1 font-semibold">
-                    {billingCycle === "annual" ? "$310 / case" : "$339 / case"}
+                    "$350 / completed case"
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">$250 MD fee + platform fee • $0 monthly commitment</p>
+                  <p className="text-[10px] text-slate-400 mt-1">$350 per completed case • $0 monthly commitment</p>
                 </div>
               </label>
 
+              {/* Paused recommended Standard ASC tier; revisit when bulk pricing is finalized.
               <label
                 className={`rounded-xl border p-3.5 cursor-pointer transition flex flex-col justify-between ${
-                  selectedPlan === "asc-growth"
+                  selectedPlan === "enterprise"
                     ? "border-teal-400 bg-teal-950/70 shadow-sm"
                     : "border-slate-800 bg-slate-950/60 hover:border-slate-700"
                 }`}
@@ -210,21 +211,19 @@ function SignUpForm() {
                     <input
                       type="radio"
                       name="plan"
-                      checked={selectedPlan === "asc-growth"}
-                      onChange={() => setSelectedPlan("asc-growth")}
+                      checked={selectedPlan === "enterprise"}
+                      onChange={() => setSelectedPlan("enterprise")}
                       className="text-teal-500 focus:ring-teal-400"
                     />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300">Most Popular</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300">Bulk pricing</span>
                   </div>
-                  <p className="font-bold text-sm text-white mt-2">Standard ASC</p>
-                  <p className="text-[11px] text-teal-300 mt-1 font-bold">
-                    {billingCycle === "annual" ? "$39,750 / mo" : "$42,750 / mo"}
-                  </p>
+                  <p className="font-bold text-sm text-white mt-2">Bulk custom pricing</p>
+                  <p className="text-[11px] text-teal-300 mt-1 font-bold">Custom volume pricing</p>
                   <p className="text-[10px] text-slate-300 mt-1">
-                    Includes 150 cases/mo ({billingCycle === "annual" ? "$265" : "$285"}/case, incl. $250 MD fee)
+                    Hospitals and high-volume systems: contact us to discuss a custom rate.
                   </p>
                 </div>
-              </label>
+              </label> */}
 
               <label
                 className={`rounded-xl border p-3.5 cursor-pointer transition flex flex-col justify-between ${
@@ -244,7 +243,7 @@ function SignUpForm() {
                     />
                     <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">Multi-Site</span>
                   </div>
-                  <p className="font-bold text-sm text-white mt-2">Enterprise</p>
+                  <p className="font-bold text-sm text-white mt-2">Hospital / health system</p>
                   <p className="text-[11px] text-slate-300 mt-1 font-semibold">Custom Volume Contract</p>
                   <p className="text-[10px] text-slate-400 mt-1">$250 MD fee + platform fee from ~$10/case at scale</p>
                 </div>

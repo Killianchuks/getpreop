@@ -10,17 +10,17 @@ const planDetailsMap: Record<
 > = {
   "per-case": {
     name: "Pay-As-You-Go Plan",
-    monthly: "$339",
-    annual: "$310",
-    annualTotal: "$310 / case (annual agreement)",
-    desc: "Billed on-demand per completed evaluation ($250 anesthesiologist fee + platform fee). $0 monthly recurring commitment.",
+    monthly: "$350",
+    annual: "$350",
+    annualTotal: "$350 / completed case",
+    desc: "Billed per completed evaluation. No monthly commitment.",
   },
   "asc-growth": {
-    name: "Standard ASC Subscription",
-    monthly: "$42,750",
-    annual: "$39,750",
-    annualTotal: "$477,000 / year",
-    desc: "Includes up to 150 evaluations/month ($250 anesthesiologist fee + platform fee per case). Priority 24h SLA.",
+    name: "Bulk Custom Pricing",
+    monthly: "Custom",
+    annual: "Custom",
+    annualTotal: "Volume discussion",
+    desc: "For hospitals and high-volume systems. Contact us to discuss case volume and workflow.",
   },
   enterprise: {
     name: "Enterprise Health System",
@@ -35,11 +35,11 @@ function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const planId = searchParams.get("plan") || "asc-growth";
+  const planId = searchParams.get("plan") || "per-case";
   const billingCycle = searchParams.get("billing") || "annual";
   const userEmail = searchParams.get("email") || "admin@facility.org";
 
-  const selectedPlan = planDetailsMap[planId] || planDetailsMap["asc-growth"];
+  const selectedPlan = planDetailsMap[planId] || planDetailsMap["per-case"];
   const isAnnual = billingCycle === "annual";
 
   // Price calculations
@@ -47,19 +47,15 @@ function CheckoutContent() {
     planId === "enterprise"
       ? "Custom Contract"
       : planId === "per-case"
-      ? isAnnual ? "$310.00" : "$339.00"
-      : isAnnual
-      ? "$477,000.00"
-      : "$513,000.00";
+      ? "$350.00"
+      : "Custom Contract";
 
   const billingTermText =
     planId === "enterprise"
       ? "Custom Enterprise Terms"
       : planId === "per-case"
-      ? `Billed On-Demand ($${isAnnual ? "310" : "339"} per evaluation: $250 MD fee + platform fee)`
-      : isAnnual
-      ? "Billed Annually ($39,750/mo — $250 MD fee + $15 platform fee per case)"
-      : "Billed Monthly ($42,750/mo — $250 MD fee + $35 platform fee per case)";
+      ? "Billed per completed evaluation ($350 per case)"
+      : "Bulk pricing discussed with your hospital or high-volume health system";
 
   // Form State
   const [paymentMethod, setPaymentMethod] = useState<"card" | "ach" | "po">("card");

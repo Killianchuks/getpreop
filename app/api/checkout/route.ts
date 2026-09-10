@@ -7,15 +7,11 @@ const stripe = process.env.STRIPE_SECRET_KEY
 
 const planPriceMap: Record<string, { annual: number; monthly: number; label: string }> = {
   "per-case": {
-    annual: 31000,
-    monthly: 33900,
+    annual: 35000,
+    monthly: 35000,
     label: "Pay-As-You-Go Plan",
   },
-  "asc-growth": {
-    annual: 47700000,
-    monthly: 51300000,
-    label: "Standard ASC Subscription",
-  },
+  // "asc-growth" is intentionally paused while high-volume bulk pricing is finalized.
   enterprise: {
     annual: 25000000,
     monthly: 25000000,
@@ -33,11 +29,11 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const planId = body.planId ?? "asc-growth";
+    const planId = body.planId ?? "per-case";
     const billingCycle = body.billingCycle ?? "annual";
     const email = body.email ?? "admin@facility.org";
 
-    const selectedPlan = planPriceMap[planId] ?? planPriceMap["asc-growth"];
+    const selectedPlan = planPriceMap[planId] ?? planPriceMap["per-case"];
     const isRecurring = planId !== "enterprise";
     const amount = billingCycle === "annual" ? selectedPlan.annual : selectedPlan.monthly;
     const interval = billingCycle === "annual" ? "year" : "month";
