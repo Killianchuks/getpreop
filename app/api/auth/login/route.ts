@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { loginSchema } from "@/lib/validation";
 
+const destinationByRole = {
+  PATIENT: "/patients/portal",
+  SURGERY_CENTER: "/surgery-centers/dashboard",
+  ANESTHESIOLOGIST: "/anesthesiologists/workspace",
+  ADMIN: "/admin",
+} as const;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -44,6 +51,7 @@ export async function POST(request: Request) {
         email: user.email,
         role: user.role,
       },
+      redirectTo: destinationByRole[user.role],
     });
 
     response.cookies.set("getpreop_role", user.role, {

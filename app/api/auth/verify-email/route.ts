@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashVerificationCode } from "@/lib/email-verification";
 
+const destinationByRole = {
+  PATIENT: "/patients/portal",
+  SURGERY_CENTER: "/surgery-centers/dashboard",
+  ANESTHESIOLOGIST: "/anesthesiologists/workspace",
+  ADMIN: "/admin",
+} as const;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -30,7 +37,7 @@ export async function POST(request: Request) {
       prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } }),
     ]);
 
-    const response = NextResponse.json({ success: true, role: user.role });
+    const response = NextResponse.json({ success: true, role: user.role, redirectTo: destinationByRole[user.role] });
     response.cookies.set("getpreop_role", user.role, { httpOnly: false, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
     response.cookies.set("getpreop_user", user.email, { httpOnly: false, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
     return response;

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 
 const destinationByRole: Record<string, string> = {
@@ -12,7 +11,6 @@ const destinationByRole: Record<string, string> = {
 };
 
 function LoginContent() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +35,7 @@ function LoginContent() {
         return;
       }
 
-      router.push(destinationByRole[data.user.role] ?? "/");
+      window.location.assign(data.redirectTo ?? destinationByRole[data.user.role] ?? "/");
     } catch {
       setError("Unable to connect. Please try again.");
     } finally {
