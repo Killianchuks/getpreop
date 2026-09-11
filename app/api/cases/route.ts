@@ -38,11 +38,14 @@ export async function GET(request: Request) {
 
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { fullName: true, role: true },
+      select: { fullName: true, role: true, anesthesiologistProfile: { select: { adminApprovedAt: true } } },
     });
 
     if (!user || user.role !== "ANESTHESIOLOGIST") {
       return NextResponse.json({ error: "Anesthesiologist access required" }, { status: 403 });
+    }
+    if (!user.anesthesiologistProfile?.adminApprovedAt) {
+      return NextResponse.json({ error: "Clinician approval required" }, { status: 403 });
     }
 
     return NextResponse.json({ cases: getCasesForDoctor(user.fullName).map(withEarnings), doctor: user.fullName });

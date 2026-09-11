@@ -1,6 +1,7 @@
 import { ClinicianSidebar } from "@/components/clinician-sidebar";
 import { CURRENT_DOCTOR, getDoctorProfile } from "@/lib/case-assignment-data";
 import { getCurrentUser } from "@/lib/current-user";
+import { ClinicianAccessGate } from "@/components/clinician-access-gate";
 
 export default async function AnesthesiologistWorkspaceLayout({
   children,
@@ -17,7 +18,7 @@ export default async function AnesthesiologistWorkspaceLayout({
         doctorName={doctorName}
         specialtyFocus={profile?.specialtyFocus ?? (user?.anesthesiologistProfile?.licenseRegion ? `Licensed in ${user.anesthesiologistProfile.licenseRegion}` : "Anesthesiology")}
       />
-      <div className="flex-1 overflow-x-auto px-6 py-6 md:px-8 md:py-8">{children}</div>
+      <div className="flex-1 overflow-x-auto px-6 py-6 md:px-8 md:py-8"><ClinicianAccessGate>{children}</ClinicianAccessGate></div>
     </div>
   );
 }

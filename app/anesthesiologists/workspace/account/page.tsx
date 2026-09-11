@@ -1,7 +1,9 @@
-import { CURRENT_DOCTOR, getDoctorOverview, getPayoutForCase, STATE_COMPENSATION_RATES } from "@/lib/case-assignment-data";
+import { getDoctorOverview, getPayoutForCase, STATE_COMPENSATION_RATES } from "@/lib/case-assignment-data";
+import { getCurrentUser } from "@/lib/current-user";
 
-export default function ClinicianAccountPage() {
-  const overview = getDoctorOverview(CURRENT_DOCTOR);
+export default async function ClinicianAccountPage() {
+  const user = await getCurrentUser();
+  const overview = getDoctorOverview(user?.fullName ?? "");
 
   return (
     <div className="space-y-5">

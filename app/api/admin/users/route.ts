@@ -9,7 +9,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       take: 500,
       include: {
-        anesthesiologistProfile: { select: { licenseRegion: true } },
+        anesthesiologistProfile: { select: { licenseRegion: true, onboardingCompletedAt: true, adminApprovedAt: true } },
         surgeryCenter: { select: { name: true } },
       },
     });
@@ -24,6 +24,8 @@ export async function GET() {
         joined: user.createdAt.toISOString(),
         verified: Boolean(user.emailVerifiedAt),
         active: Boolean(user.passwordHash),
+        onboardingComplete: Boolean(user.anesthesiologistProfile?.onboardingCompletedAt),
+        adminApproved: Boolean(user.anesthesiologistProfile?.adminApprovedAt),
       })),
     });
   } catch (error) {
@@ -36,6 +38,12 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const id = typeof body.id === "string" ? body.id : "";
+    if (body.action === "approve") {
+      const profile = await prisma.anesthesiologistProfile.findUnique({ where: { userId: id } });
+      if (!profile?.onboardingCompletedAt) return NextResponse.json({ error: "This clinician has not completed onboarding." }, { status: 400 });
+      await prisma.anesthesiologistProfile.update({ where: { userId: id }, data: { adminApprovedAt: new Date(), verified: true, verificationDate: new Date() } });
+      return NextResponse.json({ approved: true, id });
+    }
     const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const role = typeof body.role === "string" ? body.role : "";

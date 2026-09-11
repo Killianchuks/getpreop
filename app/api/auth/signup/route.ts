@@ -61,6 +61,14 @@ export async function POST(request: Request) {
         },
       });
 
+    if (user.role === "ANESTHESIOLOGIST") {
+      await prisma.anesthesiologistProfile.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { userId: user.id, licenseNumber: "", licenseRegion: "" },
+      });
+    }
+
   const { code, codeHash } = createVerificationCode();
   await prisma.emailVerificationCode.deleteMany({ where: { userId: user.id, consumedAt: null } });
   await prisma.emailVerificationCode.create({

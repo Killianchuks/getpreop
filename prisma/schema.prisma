@@ -144,6 +144,18 @@ model AnesthesiologistProfile {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenseNumber     String
   licenseRegion     String
+  licenseExpiration DateTime?
+  specialtyFocus    String?
+  bio               String?
+  licensedStates    String[] @default([])
+  attestedAt        DateTime?
+  payoutAccountHolderName String?
+  payoutAccountType String?
+  payoutRoutingLast4 String?
+  payoutAccountLast4 String?
+  taxIdLast4        String?
+  onboardingCompletedAt DateTime?
+  adminApprovedAt   DateTime?
   verified          Boolean  @default(false)
   verificationDate  DateTime?
   createdAt         DateTime @default(now())

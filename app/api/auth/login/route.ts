@@ -43,6 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
+    const redirectTo = user.role === "ANESTHESIOLOGIST"
+      ? (await prisma.anesthesiologistProfile.findUnique({ where: { userId: user.id }, select: { onboardingCompletedAt: true, adminApprovedAt: true } }))?.adminApprovedAt
+        ? destinationByRole[user.role]
+        : "/anesthesiologists/workspace/onboarding"
+      : destinationByRole[user.role];
+
     const response = NextResponse.json({
       success: true,
       user: {
@@ -51,7 +57,7 @@ export async function POST(request: Request) {
         email: user.email,
         role: user.role,
       },
-      redirectTo: destinationByRole[user.role],
+      redirectTo,
     });
 
     response.cookies.set("getpreop_role", user.role, {

@@ -1,7 +1,9 @@
-import { CURRENT_DOCTOR, getCasesForDoctor } from "@/lib/case-assignment-data";
+import { getCasesForDoctor } from "@/lib/case-assignment-data";
+import { getCurrentUser } from "@/lib/current-user";
 
-export default function ClinicianAnalyticsPage() {
-  const myCases = getCasesForDoctor(CURRENT_DOCTOR);
+export default async function ClinicianAnalyticsPage() {
+  const user = await getCurrentUser();
+  const myCases = getCasesForDoctor(user?.fullName ?? "");
 
   const byStatus = [
     { label: "Awaiting response", count: myCases.filter((c) => c.status === "ASSIGNED").length },
