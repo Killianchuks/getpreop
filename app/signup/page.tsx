@@ -8,7 +8,6 @@ const roles = [
   { id: "PATIENT", label: "Patient" },
   { id: "SURGERY_CENTER", label: "Institution / Health System" },
   { id: "ANESTHESIOLOGIST", label: "Anesthesiologist" },
-  { id: "ADMIN", label: "Admin" },
 ] as const;
 
 const availableInstitutionOptions = [

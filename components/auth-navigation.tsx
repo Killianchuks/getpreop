@@ -8,7 +8,6 @@ const roles = [
   { label: "Patient", loginHint: "Access your pre-op plan", role: "PATIENT" },
   { label: "Institution", loginHint: "Manage facility readiness", role: "SURGERY_CENTER" },
   { label: "Anesthesiologist", loginHint: "Access your clinical workspace", role: "ANESTHESIOLOGIST" },
-  { label: "Administrator", loginHint: "Manage platform operations", role: "ADMIN" },
 ];
 
 function RoleMenu({ type }: { type: "login" | "signup" }) {

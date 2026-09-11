@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 
 const destinationByRole: Record<string, string> = {
@@ -11,16 +11,8 @@ const destinationByRole: Record<string, string> = {
   ADMIN: "/admin",
 };
 
-const demoAccounts = [
-  { role: "Anesthesiologist", roleId: "ANESTHESIOLOGIST", email: "dr.liu@getpreop.test", password: "Getpreop123!" },
-  { role: "Institution", roleId: "SURGERY_CENTER", email: "operations@westsideasc.test", password: "Getpreop123!" },
-  { role: "Patient", roleId: "PATIENT", email: "taylor.morgan@getpreop.test", password: "Getpreop123!" },
-];
-
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const selectedRole = searchParams.get("role");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -58,27 +50,8 @@ function LoginContent() {
       <section className="panel mx-auto max-w-xl">
         <h1 className="text-3xl font-bold">Login</h1>
         <p className="mt-2 text-sm text-[color:var(--ink-muted)]">
-          Access the platform as an institution, anesthesiologist, patient, or admin user.
+          Access the platform as an institution, anesthesiologist, or patient.
         </p>
-
-        <div className="mt-6 rounded-lg border border-teal-100 bg-teal-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-teal-800">Demo access</p>
-          <p className="mt-1 text-xs text-teal-900">Select an account to populate the sign-in form.</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {demoAccounts.map((account) => (
-              <button
-                key={account.role}
-                type="button"
-                onClick={() => { setEmail(account.email); setPassword(account.password); setError(null); }}
-                className={`rounded-lg border p-3 text-left transition hover:border-teal-500 hover:bg-teal-50 ${selectedRole === account.roleId ? "border-teal-500 bg-teal-50" : "border-teal-100 bg-white"}`}
-              >
-                <span className="block text-xs font-bold text-slate-900">{account.role}</span>
-                <span className="mt-1 block break-all text-[11px] text-slate-600">{account.email}</span>
-                <span className="mt-1 block text-[11px] font-medium text-teal-800">Password: {account.password}</span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
           <label className="text-sm">
