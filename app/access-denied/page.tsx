@@ -22,7 +22,7 @@ export default async function AccessDeniedPage({ searchParams }: AccessDeniedPro
         <p className="mt-4 text-sm leading-6 text-[color:var(--ink-muted)]">
           Sign in with your authorized account, then return to the admin dashboard. Administrator access is intentionally not available through public signup.
         </p>
-        <Link href="/login" className="mt-6 inline-block rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-900">
+              <Link href={`/login?returnTo=${encodeURIComponent(required === "ADMIN" ? "/admin" : "/")}`} className="mt-6 inline-block rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-900">
           Go to secure login
         </Link>
       </section>

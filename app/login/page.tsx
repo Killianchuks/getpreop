@@ -9,8 +9,11 @@ const destinationByRole: Record<string, string> = {
   ANESTHESIOLOGIST: "/anesthesiologists/workspace",
   ADMIN: "/admin",
 };
+import { useSearchParams } from "next/navigation";
 
 function LoginContent() {
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +38,7 @@ function LoginContent() {
         return;
       }
 
-      window.location.assign(data.redirectTo ?? destinationByRole[data.user.role] ?? "/");
+      window.location.assign(returnTo || data.redirectTo || destinationByRole[data.user.role] || "/");
     } catch {
       setError("Unable to connect. Please try again.");
     } finally {
