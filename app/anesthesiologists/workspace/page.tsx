@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { CURRENT_DOCTOR, getDoctorOverview } from "@/lib/case-assignment-data";
+import { getCasesForDoctor, getDoctorOverview } from "@/lib/case-assignment-data";
 import { getCurrentUser } from "@/lib/current-user";
 
 export default async function AnesthesiologistDashboardPage() {
   const user = await getCurrentUser();
-  const overview = getDoctorOverview(CURRENT_DOCTOR);
-  const doctorName = user?.fullName ?? overview.doctorName;
+  const doctorName = user?.fullName ?? "Anesthesiologist";
+  const overview = getDoctorOverview(doctorName);
+  const assignedCases = getCasesForDoctor(doctorName);
+  const upcomingCase = assignedCases.find((record) => record.status === "ACCEPTED" || record.status === "INTAKE_COMPLETE");
 
   return (
     <div className="space-y-6">
@@ -45,18 +47,18 @@ export default async function AnesthesiologistDashboardPage() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          {upcomingCase ? <div>
             <p className="text-xs font-bold uppercase tracking-wider text-teal-800">Upcoming visit</p>
-            <h2 className="mt-1 text-lg font-bold text-slate-900">Faruk, Ibrahim - preoperative assessment</h2>
-            <p className="mt-1 text-sm text-slate-600">Thursday, September 4 at 11:00 AM PT · 30 minutes · Case GPO-NY-260901-005</p>
-          </div>
-          <Link href="/anesthesiologists/workspace/cases/case-5/video" className="rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-900">Join visit</Link>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">{upcomingCase.patientName} - preoperative assessment</h2>
+            <p className="mt-1 text-sm text-slate-600">{new Date(upcomingCase.surgeryDate).toLocaleDateString()} · {upcomingCase.procedure} · Case {upcomingCase.caseReference}</p>
+          </div> : <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Upcoming visit</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">No visits scheduled</h2>
+            <p className="mt-1 text-sm text-slate-600">Assigned cases will appear here when they are routed to you.</p>
+          </div>}
+          {upcomingCase ? <Link href={`/anesthesiologists/workspace/cases/${upcomingCase.id}`} className="rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-900">Open case</Link> : null}
         </div>
-        <div className="mt-4 flex flex-wrap gap-3 border-t border-slate-100 pt-4 text-xs text-slate-600">
-          <span className="rounded-full bg-teal-50 px-3 py-1.5 font-semibold text-teal-800">1-day reminder scheduled</span>
-          <span className="rounded-full bg-teal-50 px-3 py-1.5 font-semibold text-teal-800">30-minute reminder scheduled</span>
-          <Link href="/anesthesiologists/workspace/availability" className="px-3 py-1.5 font-semibold text-teal-800 hover:text-teal-950">Manage availability</Link>
-        </div>
+        {upcomingCase ? <div className="mt-4 flex flex-wrap gap-3 border-t border-slate-100 pt-4 text-xs text-slate-600"><Link href="/anesthesiologists/workspace/availability" className="px-3 py-1.5 font-semibold text-teal-800 hover:text-teal-950">Manage availability</Link></div> : null}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
