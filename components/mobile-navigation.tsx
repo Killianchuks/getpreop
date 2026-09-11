@@ -12,6 +12,7 @@ const primaryLinks = [
   ["For Institutions", "/how-we-partner/institutions"],
   ["For Clinicians", "/how-we-partner/clinicians"],
   ["What We Offer", "/what-we-offer"],
+  ["Pricing", "/pricing"],
   ["About Us", "/about"],
 ] as const;
 

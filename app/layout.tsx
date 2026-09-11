@@ -42,6 +42,7 @@ export default function RootLayout({
               <Link href="/who-we-serve" className="hover:text-teal-800 transition">Who We Serve</Link>
               <PartnerNavigation />
               <Link href="/what-we-offer" className="hover:text-teal-800 transition">What We Offer</Link>
+              <Link href="/pricing" className="hover:text-teal-800 transition">Pricing</Link>
               <Link href="/about" className="hover:text-teal-800 transition">About Us</Link>
             </nav>
 
