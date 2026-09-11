@@ -24,6 +24,22 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { email: "admin@getpreop.test" },
+    update: {
+      fullName: "GetPreOp Administrator",
+      role: "ADMIN",
+      passwordHash: demoPasswordHash,
+      surgeryCenterId: null,
+    },
+    create: {
+      email: "admin@getpreop.test",
+      fullName: "GetPreOp Administrator",
+      role: "ADMIN",
+      passwordHash: demoPasswordHash,
+    },
+  });
+
   const anesthesiologistUser = await prisma.user.upsert({
     where: { email: "dr.liu@getpreop.test" },
     update: {
