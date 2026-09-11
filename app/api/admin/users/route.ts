@@ -9,7 +9,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       take: 500,
       include: {
-        anesthesiologistProfile: { select: { licenseRegion: true, onboardingCompletedAt: true, adminApprovedAt: true } },
+        anesthesiologistProfile: { select: { licenseRegion: true, onboardingCompletedAt: true, adminApprovedAt: true, malpracticeInsuranceStatus: true, documents: { select: { documentType: true, fileName: true } } } },
         surgeryCenter: { select: { name: true } },
       },
     });
@@ -26,6 +26,8 @@ export async function GET() {
         active: Boolean(user.passwordHash),
         onboardingComplete: Boolean(user.anesthesiologistProfile?.onboardingCompletedAt),
         adminApproved: Boolean(user.anesthesiologistProfile?.adminApprovedAt),
+        evidence: user.anesthesiologistProfile?.documents ?? [],
+        malpracticeInsuranceStatus: user.anesthesiologistProfile?.malpracticeInsuranceStatus ?? null,
       })),
     });
   } catch (error) {

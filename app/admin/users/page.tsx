@@ -4,7 +4,7 @@ import { Edit3, Eye, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type UserRole = "All" | "Admin" | "Patient" | "Anesthesiologist" | "Surgery center";
-type ManagedUser = { id: string; name: string; email: string; role: Exclude<UserRole, "All">; region: string; joined: string; verified: boolean; active: boolean; onboardingComplete?: boolean; adminApproved?: boolean };
+type ManagedUser = { id: string; name: string; email: string; role: Exclude<UserRole, "All">; region: string; joined: string; verified: boolean; active: boolean; onboardingComplete?: boolean; adminApproved?: boolean; evidence?: { documentType: string; fileName: string }[]; malpracticeInsuranceStatus?: string | null };
 
 const fallbackUsers: ManagedUser[] = [
   { id: "demo-amara", name: "Dr. Amara Chen", email: "amara.chen@getpreop.test", role: "Anesthesiologist", region: "California", joined: "Aug 11, 2026", verified: true, active: true },

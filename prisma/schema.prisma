@@ -151,15 +151,35 @@ model AnesthesiologistProfile {
   attestedAt        DateTime?
   payoutAccountHolderName String?
   payoutAccountType String?
+  bankName          String?
   payoutRoutingLast4 String?
   payoutAccountLast4 String?
   taxIdLast4        String?
+  malpracticeInsuranceStatus String?
+  malpracticeProvider String?
+  malpracticePolicyNumber String?
   onboardingCompletedAt DateTime?
   adminApprovedAt   DateTime?
   verified          Boolean  @default(false)
   verificationDate  DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  documents         ClinicianDocument[]
+}
+
+model ClinicianDocument {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     AnesthesiologistProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  documentType String
+  fileName    String
+  mimeType    String
+  fileSize    Int
+  content     Bytes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([profileId, documentType])
 }
 
 model SecureMessage {
