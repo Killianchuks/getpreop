@@ -13,6 +13,7 @@ export async function getCurrentUser() {
       fullName: true,
       email: true,
       role: true,
+      surgeryCenterId: true,
       anesthesiologistProfile: {
         select: {
           licenseNumber: true,
