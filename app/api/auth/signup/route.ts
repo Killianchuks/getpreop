@@ -1,6 +1,7 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { createVerificationCode, sendVerificationEmail } from "@/lib/email-verification";
 import { signUpSchema } from "@/lib/validation";
 
 export async function POST(request: Request) {
@@ -60,54 +61,33 @@ export async function POST(request: Request) {
         },
       });
 
-  const response = NextResponse.json(
-    {
-      success: true,
-      user: {
-        id: user.id,
-        fullName: user.fullName,
+  const { code, codeHash } = createVerificationCode();
+  await prisma.emailVerificationCode.deleteMany({ where: { userId: user.id, consumedAt: null } });
+  await prisma.emailVerificationCode.create({
+    data: {
+      userId: user.id,
+      codeHash,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    },
+  });
+
+  try {
+    const emailResult = await sendVerificationEmail(user.email, code);
+    return NextResponse.json(
+      {
+        success: true,
+        verificationRequired: true,
         email: user.email,
         role: user.role,
-        institutionTypes: parsed.data.institutionTypes,
-        isHospitalNetwork: parsed.data.isHospitalNetwork,
-        plan: parsed.data.plan,
-        billingCycle: parsed.data.billingCycle,
+        ...(emailResult.developmentCode ? { developmentCode: emailResult.developmentCode } : {}),
       },
-    },
-    { status: 201 },
-  );
-
-  response.cookies.set("getpreop_role", user.role, {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24,
-  });
-
-  response.cookies.set("getpreop_user", user.email, {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24,
-  });
-
-  if (parsed.data.plan) {
-    response.cookies.set("getpreop_plan", parsed.data.plan, {
-      httpOnly: false,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24,
-    });
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Signup verification email error:", error);
+    return NextResponse.json(
+      { error: "Account created, but we could not send the verification email. Please try again." },
+      { status: 503 },
+    );
   }
-
-  if (parsed.data.billingCycle) {
-    response.cookies.set("getpreop_billing", parsed.data.billingCycle, {
-      httpOnly: false,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24,
-    });
-  }
-
-  return response;
 }

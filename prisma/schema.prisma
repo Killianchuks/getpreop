@@ -47,12 +47,26 @@ model User {
   passwordHash   String?
   role           Role
   surgeryCenterId String?
+  emailVerifiedAt DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   surgeryCenter  SurgeryCenter?     @relation(fields: [surgeryCenterId], references: [id], onDelete: SetNull)
   patientProfile PatientProfile?
   anesthesiologistProfile AnesthesiologistProfile?
   consultations  Teleconsultation[] @relation("ConsultantBookings")
+  emailVerificationCodes EmailVerificationCode[]
+}
+
+model EmailVerificationCode {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, expiresAt])
 }
 
 model PatientProfile {

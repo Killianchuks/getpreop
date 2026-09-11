@@ -109,12 +109,7 @@ function SignUpForm() {
         return;
       }
 
-      // If user is registering an institution or patient, redirect to Payment Gateway Checkout
-      if (role === "SURGERY_CENTER" || role === "PATIENT") {
-        router.push(`/checkout?plan=${encodeURIComponent(selectedPlan)}&billing=${encodeURIComponent(billingCycle)}&email=${encodeURIComponent(email)}`);
-      } else {
-        router.push(destinationByRole[data.user.role] ?? "/");
-      }
+      router.push(`/verify-email?email=${encodeURIComponent(email)}&role=${encodeURIComponent(data.role ?? role)}&plan=${encodeURIComponent(selectedPlan)}&billing=${encodeURIComponent(billingCycle)}`);
     } catch {
       setError("Unable to connect. Please try again.");
     } finally {

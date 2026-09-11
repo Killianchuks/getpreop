@@ -30,6 +30,7 @@ async function main() {
       fullName: "GetPreOp Administrator",
       role: "ADMIN",
       passwordHash: demoPasswordHash,
+      emailVerifiedAt: new Date(),
       surgeryCenterId: null,
     },
     create: {
@@ -37,6 +38,7 @@ async function main() {
       fullName: "GetPreOp Administrator",
       role: "ADMIN",
       passwordHash: demoPasswordHash,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -46,12 +48,14 @@ async function main() {
       fullName: "Dr. Amy Liu",
       role: "ANESTHESIOLOGIST",
       passwordHash: demoPasswordHash,
+      emailVerifiedAt: new Date(),
     },
     create: {
       email: "dr.liu@getpreop.test",
       fullName: "Dr. Amy Liu",
       role: "ANESTHESIOLOGIST",
       passwordHash: demoPasswordHash,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -62,6 +66,7 @@ async function main() {
       role: "SURGERY_CENTER",
       passwordHash: demoPasswordHash,
       surgeryCenterId: surgeryCenter.id,
+      emailVerifiedAt: new Date(),
     },
     create: {
       email: "operations@westsideasc.test",
@@ -69,6 +74,7 @@ async function main() {
       role: "SURGERY_CENTER",
       passwordHash: demoPasswordHash,
       surgeryCenterId: surgeryCenter.id,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -95,12 +101,14 @@ async function main() {
       fullName: "Taylor Morgan",
       role: "PATIENT",
       passwordHash: demoPasswordHash,
+      emailVerifiedAt: new Date(),
     },
     create: {
       email: "taylor.morgan@getpreop.test",
       fullName: "Taylor Morgan",
       role: "PATIENT",
       passwordHash: demoPasswordHash,
+      emailVerifiedAt: new Date(),
     },
   });
 
