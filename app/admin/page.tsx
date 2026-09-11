@@ -44,6 +44,7 @@ const navigation = [
       { id: "staff", href: "/admin/staff", label: "Staff", icon: Stethoscope, count: "3" },
       { id: "users", href: "/admin/users", label: "Users", icon: Users, count: "18" },
       { id: "support", href: "/admin/support", label: "Support tickets", icon: CircleHelp, count: "1" },
+      { id: "cases-dashboard", href: "/admin/case-assignment", label: "Cases", icon: ClipboardList, count: "3" },
     ],
   },
   {

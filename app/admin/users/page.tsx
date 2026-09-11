@@ -1,11 +1,11 @@
 "use client";
 
 import { Edit3, Eye, Plus, Search, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type UserRole = "All" | "Admin" | "Patient" | "Anesthesiologist" | "Surgery center";
 
-const users = [
+const fallbackUsers = [
   { name: "Dr. Amara Chen", email: "amara.chen@getpreop.test", role: "Anesthesiologist", region: "California", joined: "Aug 11, 2026", verified: true, active: true },
   { name: "Jordan Williams", email: "jordan.williams@meridiansurgical.org", role: "Surgery center", region: "California", joined: "Aug 10, 2026", verified: true, active: true },
   { name: "Priya Raghunathan", email: "priya.raghunathan@example.com", role: "Patient", region: "New York", joined: "Aug 3, 2026", verified: true, active: true },
@@ -17,10 +17,24 @@ const users = [
 const roles: UserRole[] = ["All", "Admin", "Patient", "Anesthesiologist", "Surgery center"];
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState(fallbackUsers);
+  const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>("All");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All status");
-  const [activeUsers, setActiveUsers] = useState(() => new Set(users.filter((user) => user.active).map((user) => user.email)));
+  const [activeUsers, setActiveUsers] = useState(() => new Set(fallbackUsers.filter((user) => user.active).map((user) => user.email)));
+
+  useEffect(() => {
+    fetch("/api/admin/users")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Unable to load users")))
+      .then((data) => {
+        const nextUsers = data.users ?? [];
+        setUsers(nextUsers);
+        setActiveUsers(new Set(nextUsers.filter((user: { active: boolean }) => user.active).map((user: { email: string }) => user.email)));
+      })
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredUsers = users.filter((user) => {
     const query = search.trim().toLowerCase();
@@ -61,7 +75,7 @@ export default function AdminUsersPage() {
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Name</th><th className="px-5 py-3">Email</th><th className="px-5 py-3">Role</th><th className="px-5 py-3">Region</th><th className="px-5 py-3">Joined</th><th className="px-5 py-3">Access</th><th className="px-5 py-3 text-right">Actions</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredUsers.map((user) => {
+                {loading ? <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">Loading registered users...</td></tr> : filteredUsers.map((user) => {
                   const isActive = activeUsers.has(user.email);
                   return <tr key={user.email} className="hover:bg-slate-50/70"><td className="px-5 py-4"><p className="font-semibold text-slate-900">{user.name}</p><p className={`mt-1 text-xs font-medium ${user.verified ? "text-teal-700" : "text-amber-700"}`}>{user.verified ? "Verified" : "Verification pending"}</p></td><td className="px-5 py-4 text-slate-600">{user.email}</td><td className="px-5 py-4"><span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{user.role}</span></td><td className="px-5 py-4 text-slate-600">{user.region}</td><td className="px-5 py-4 text-slate-600">{user.joined}</td><td className="px-5 py-4"><button type="button" aria-label={`Toggle ${user.name} access`} onClick={() => setActiveUsers((current) => { const next = new Set(current); isActive ? next.delete(user.email) : next.add(user.email); return next; })} className={`relative h-6 w-11 rounded-full transition ${isActive ? "bg-teal-700" : "bg-slate-300"}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${isActive ? "left-[22px]" : "left-0.5"}`} /></button><p className="mt-1 text-[11px] font-medium text-slate-500">{isActive ? "Active" : "Inactive"}</p></td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button type="button" aria-label={`View ${user.name}`} className="rounded-lg p-2 text-teal-800 hover:bg-teal-50"><Eye size={17} /></button><button type="button" aria-label={`Edit ${user.name}`} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"><Edit3 size={17} /></button><button type="button" aria-label={`Delete ${user.name}`} className="rounded-lg p-2 text-rose-700 hover:bg-rose-50"><Trash2 size={17} /></button></div></td></tr>;
                 })}
