@@ -10,6 +10,7 @@ const pageRoleMap: Record<string, string[]> = {
 const apiRoleMap: Record<string, string[]> = {
   "/api/admin/users": ["ADMIN"],
   "/api/anesthesiologists/onboarding": ["ANESTHESIOLOGIST"],
+  "/api/institutions/referrals": ["SURGERY_CENTER"],
   "/api/referrals/create": ["SURGERY_CENTER", "ADMIN"],
   "/api/reports/one-page": ["ANESTHESIOLOGIST", "SURGERY_CENTER", "ADMIN"],
   "/api/messages/send": ["PATIENT", "ANESTHESIOLOGIST", "SURGERY_CENTER", "ADMIN"],
@@ -61,5 +62,6 @@ export const config = {
     "/api/messages/send",
     "/api/admin/:path*",
     "/api/anesthesiologists/:path*",
+    "/api/institutions/:path*",
   ],
 };

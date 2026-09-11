@@ -1,7 +1,9 @@
-import { getAnalytics } from "@/lib/institution-data";
+import { getCurrentUser } from "@/lib/current-user";
+import { getInstitutionAnalytics } from "@/lib/institution-dashboard";
 
-export default function AnalyticsPage() {
-  const analytics = getAnalytics();
+export default async function AnalyticsPage() {
+  const user = await getCurrentUser();
+  const analytics = await getInstitutionAnalytics(user?.surgeryCenterId);
   const maxTurnaround = Math.max(...analytics.turnaroundBuckets.map((b) => b.count), 1);
   const maxRisk = Math.max(...analytics.riskMix.map((r) => r.count), 1);
   const maxCancellations = Math.max(...analytics.cancellationsOverTime.map((c) => c.total), 1);
@@ -61,7 +63,7 @@ export default function AnalyticsPage() {
           <h2 className="text-sm font-bold text-slate-900">Cancellations over time</h2>
           <p className="mt-1 text-xs text-slate-500">Total cancellations and the preventable subset, by month.</p>
           <div className="mt-6 flex h-40 items-end gap-6">
-            {analytics.cancellationsOverTime.map((point) => (
+            {analytics.cancellationsOverTime.length === 0 ? <p className="flex h-40 items-center justify-center text-sm text-slate-500">No cancellation records have been recorded for this facility.</p> : analytics.cancellationsOverTime.map((point) => (
               <div key={point.month} className="flex flex-1 flex-col items-center gap-2">
                 <div className="flex w-full items-end gap-1" style={{ height: "100%" }}>
                   <div

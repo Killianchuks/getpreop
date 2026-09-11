@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   STAGE_ORDER,
   computeClearance,
   formatSurgeryDate,
-  getReferrals,
   type RiskLevel,
+  type ReferralRecord,
 } from "@/lib/institution-data";
 
 const riskBadgeStyles: Record<string, string> = {
@@ -31,10 +31,15 @@ const clearanceBadgeStyles: Record<string, string> = {
 const stageLabelByStage = Object.fromEntries(STAGE_ORDER.map((s) => [s.stage, s.label]));
 
 export default function ReferralsPage() {
-  const referrals = useMemo(() => getReferrals(), []);
+  const [referrals, setReferrals] = useState<ReferralRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("ALL");
   const [riskFilter, setRiskFilter] = useState<string>("ALL");
+
+  useEffect(() => {
+    fetch("/api/institutions/referrals").then((response) => response.json()).then((data) => setReferrals(data.referrals ?? [])).finally(() => setLoading(false));
+  }, []);
 
   const filtered = referrals.filter((r) => {
     const matchesQuery =
@@ -96,7 +101,7 @@ export default function ReferralsPage() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-2">
-        <p className="px-3 py-2 text-xs font-semibold text-slate-500">{filtered.length} referrals</p>
+        <p className="px-3 py-2 text-xs font-semibold text-slate-500">{loading ? "Loading referrals..." : `${filtered.length} referrals`}</p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
