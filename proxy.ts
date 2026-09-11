@@ -58,5 +58,6 @@ export const config = {
     "/api/referrals/create",
     "/api/reports/one-page",
     "/api/messages/send",
+    "/api/admin/:path*",
   ],
 };
