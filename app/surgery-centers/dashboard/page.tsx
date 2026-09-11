@@ -4,6 +4,7 @@ import {
   formatSurgeryDate,
   getInstitutionOverview,
 } from "@/lib/institution-data";
+import { getCurrentUser } from "@/lib/current-user";
 
 const riskBadgeStyles: Record<string, string> = {
   SPECIALIST: "bg-red-50 text-red-700 border-red-100",
@@ -17,14 +18,16 @@ const riskLabels: Record<string, string> = {
   READY: "Ready",
 };
 
-export default function InstitutionDashboardPage() {
+export default async function InstitutionDashboardPage() {
   const overview = getInstitutionOverview();
+  const user = await getCurrentUser();
+  const facilityName = user?.surgeryCenter?.name ?? overview.facilityName;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">{overview.facilityName}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">{facilityName}</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">Pre-op readiness at a glance</h1>
           <p className="mt-1 text-sm text-slate-500">
             Every case with a scheduled date, its clearance deadline, and what is still blocking it.

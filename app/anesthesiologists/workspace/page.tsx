@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { CURRENT_DOCTOR, getDoctorOverview } from "@/lib/case-assignment-data";
+import { getCurrentUser } from "@/lib/current-user";
 
-export default function AnesthesiologistDashboardPage() {
+export default async function AnesthesiologistDashboardPage() {
+  const user = await getCurrentUser();
   const overview = getDoctorOverview(CURRENT_DOCTOR);
+  const doctorName = user?.fullName ?? overview.doctorName;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-800">Clinical Portal</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Welcome back, {overview.doctorName}</h1>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">Welcome back, {doctorName}</h1>
           <p className="mt-1 text-sm text-slate-500">Your assigned cases, pending actions, and recent activity.</p>
         </div>
         <Link
