@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const email = body.email ?? "admin@facility.org";
 
     const selectedPlan = planPriceMap[planId] ?? planPriceMap["per-case"];
-    const isRecurring = planId !== "enterprise";
+    const isRecurring = planId === "asc-growth";
     const amount = billingCycle === "annual" ? selectedPlan.annual : selectedPlan.monthly;
     const interval = billingCycle === "annual" ? "year" : "month";
 
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
         planId,
         billingCycle,
         email,
+        referralId: body.referralId ?? "",
       },
     });
 

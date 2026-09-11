@@ -22,17 +22,36 @@ export default function NewReferralPage() {
         surgeryCenterName: "Meridian Surgical Center",
         patientFullName: form.get("patientFullName"),
         patientEmail: form.get("patientEmail"),
+        facilityEmail: form.get("facilityEmail"),
         procedureName: form.get("procedureName"),
         scheduledDate: form.get("scheduledDate"),
         priority: form.get("priority"),
       }),
     });
 
-    if (response.ok) {
-      router.push("/surgery-centers/dashboard/referrals");
+    if (!response.ok) {
+      setError("We could not create this referral. Review the required details and try again.");
+      setSubmitting(false);
       return;
     }
-    setError("We could not create this referral. Review the required details and try again.");
+
+    const referralData = await response.json();
+    const checkoutResponse = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        planId: "per-case",
+        billingCycle: "annual",
+        email: form.get("facilityEmail"),
+        referralId: referralData.referralId,
+      }),
+    });
+    const checkoutData = await checkoutResponse.json();
+    if (checkoutResponse.ok && checkoutData.url) {
+      window.location.href = checkoutData.url;
+      return;
+    }
+    setError(checkoutData.error ?? "Referral created, but payment could not be started.");
     setSubmitting(false);
   }
 
@@ -48,11 +67,12 @@ export default function NewReferralPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-800">Patient full name<input required name="patientFullName" className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none focus:border-teal-700" /></label>
           <label className="text-sm font-medium text-slate-800">Patient email<input required type="email" name="patientEmail" className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none focus:border-teal-700" /></label>
+          <label className="text-sm font-medium text-slate-800 sm:col-span-2">Facility billing email<input required type="email" name="facilityEmail" placeholder="billing@facility.org" className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none focus:border-teal-700" /></label>
         </div>
         <label className="block text-sm font-medium text-slate-800">Procedure<input required name="procedureName" className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none focus:border-teal-700" /></label>
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-medium text-slate-800">Scheduled surgery date<input required type="datetime-local" name="scheduledDate" className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 outline-none focus:border-teal-700" /></label>
-          <label className="text-sm font-medium text-slate-800">Priority<select name="priority" defaultValue="routine" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-teal-700"><option value="routine">Routine - 48 hour target</option><option value="urgent">Urgent - 24 hour target</option></select></label>
+          <label className="text-sm font-medium text-slate-800">Priority<select name="priority" defaultValue="standard" className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 outline-none focus:border-teal-700"><option value="standard">Routine - 48 hour target</option><option value="urgent">Urgent - 24 hour target</option></select></label>
         </div>
         {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
         <button disabled={submitting} type="submit" className="rounded-lg bg-teal-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-900 disabled:bg-slate-300">{submitting ? "Creating referral..." : "Create referral"}</button>
