@@ -47,6 +47,8 @@ export const referralSchema = z.object({
   surgeryCenterName: z.string().min(2),
   patientFullName: z.string().min(2),
   patientEmail: z.email(),
+  patientPhone: z.string().min(7).max(30),
+  medicalHistory: z.string().min(5).max(5_000),
   procedureName: z.string().min(3),
   scheduledDate: z.iso.datetime(),
   priority: z.enum(["standard", "urgent"]).default("standard"),

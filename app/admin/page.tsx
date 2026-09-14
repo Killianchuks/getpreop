@@ -59,6 +59,7 @@ const navigation = [
     label: "Network & billing",
     items: [
       { id: "facilities", href: "/admin/facilities", label: "Institutional partners", icon: Building2, count: "2" },
+      { id: "bd-center", href: "/admin/bd-center", label: "BD center", icon: Users, count: "CRM" },
       { id: "payments", href: "/admin/payments", label: "Payments", icon: CreditCard },
       { id: "pricing", href: "/admin/pricing", label: "Pricing", icon: ReceiptText },
       { id: "payouts", href: "/admin/payouts", label: "Clinician payouts", icon: WalletCards },

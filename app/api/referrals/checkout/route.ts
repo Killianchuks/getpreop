@@ -6,6 +6,21 @@ import { referralSchema } from "@/lib/validation";
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const REFERRAL_FEE_CENTS = 35_000;
+
+function resolveAppUrl(candidate: string | undefined): string {
+  const raw = candidate?.trim();
+  if (!raw) return "https://www.getpreop.com";
+
+  try {
+    const url = new URL(raw);
+    if (url.protocol === "http:" || url.protocol === "https:") return url.origin;
+  } catch {
+    // ignore invalid env values and fall back to the production domain
+  }
+
+  return "https://www.getpreop.com";
+}
+
 const supportingNoteSchema = z.object({
   name: z.string().min(1).max(255),
   type: z.string().min(3).max(100),
@@ -55,12 +70,15 @@ export async function POST(request: Request) {
         supportingNoteContent: supportingNote.data ? Buffer.from(supportingNote.data.content, "base64") : undefined,
       },
     });
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const baseUrl = resolveAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+    const successUrl = `${baseUrl}/surgery-centers/dashboard/referrals/new?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${baseUrl}/surgery-centers/dashboard/referrals/new?payment=cancelled`;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      payment_method_types: ["card"],
       customer_email: facilityEmail.data,
-      success_url: `${baseUrl}/surgery-centers/dashboard/referrals/new?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/surgery-centers/dashboard/referrals/new?payment=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       line_items: [{
         quantity: 1,
         price_data: {
@@ -82,7 +100,17 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ url: session.url });
   } catch (error) {
-    console.error("Referral checkout session creation failed:", error);
-    return NextResponse.json({ error: "Unable to start secure payment." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown checkout error";
+    console.error("Referral checkout session creation failed:", {
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+      databaseUrlConfigured: Boolean(process.env.DATABASE_URL),
+      stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY),
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
+    });
+    return NextResponse.json({
+      error: "Unable to start secure payment.",
+      details: message,
+    }, { status: 500 });
   }
 }
