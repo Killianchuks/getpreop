@@ -260,6 +260,7 @@ model BusinessDevelopmentContact {
   country          String?
   specialty        String?
   organizationType String?
+  salutation       String?
   notes            String?
   tags             String[]                      @default([])
   status           String                        @default("NEW")

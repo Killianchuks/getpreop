@@ -97,6 +97,7 @@ export async function GET(request: Request) {
         country: contact.country,
         specialty: contact.specialty,
         organizationType: contact.organizationType,
+        salutation: contact.salutation,
         tags: contact.tags,
         status: contact.status,
         notes: contact.notes,
@@ -138,6 +139,7 @@ export async function POST(request: Request) {
           zipCode: typeof body.zipCode === "string" ? body.zipCode.trim() || null : null,
           country: typeof body.country === "string" ? body.country.trim() || null : null,
           specialty: typeof body.specialty === "string" ? body.specialty.trim() || null : null,
+          salutation: body.salutation === "DOCTOR" || body.salutation === "NAME" ? body.salutation : null,
           notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
           status: "NEW",
         },
@@ -189,6 +191,8 @@ export async function POST(request: Request) {
       const specialty = getField(row, ["specialty", "specialtyFocus", "serviceLine"]);
       const organizationType = getField(row, ["organizationType", "organizationCategory", "practiceType", "facilityType", "facilityCategory", "businessType", "type", "category", "industry", "subDepartments", "subDepartment"]);
       const notes = getField(row, ["notes", "remarks", "description"]);
+      const salutationRaw = getField(row, ["salutation", "addressAs", "greeting", "titlePreference"])?.toLowerCase();
+      const salutation = salutationRaw ? (/^dr/.test(salutationRaw) ? "DOCTOR" : /^name|first/.test(salutationRaw) ? "NAME" : null) : null;
 
       if (!organizationName && !contactName && !email) continue;
 
@@ -226,6 +230,7 @@ export async function POST(request: Request) {
             country: country ?? existingContact.country,
             specialty: specialty ?? existingContact.specialty,
             organizationType: organizationType ?? existingContact.organizationType,
+            salutation: salutation ?? existingContact.salutation,
             notes: notes ?? existingContact.notes,
             source: uploadName,
             status: existingContact.status || "NEW",
@@ -249,6 +254,7 @@ export async function POST(request: Request) {
             country: country ?? null,
             specialty: specialty ?? null,
             organizationType: organizationType ?? null,
+            salutation: salutation ?? null,
             notes: notes ?? null,
             status: "NEW",
           },
@@ -269,23 +275,33 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const contactId = typeof body.contactId === "string" ? body.contactId : "";
+    const contactIds = Array.isArray(body.contactIds) ? body.contactIds.filter((value: unknown): value is string => typeof value === "string") : undefined;
     const status = typeof body.status === "string" ? body.status : undefined;
     const notes = typeof body.notes === "string" ? body.notes : undefined;
-    const tags = Array.isArray(body.tags)
+    const salutation = body.salutation === "DOCTOR" || body.salutation === "NAME" || body.salutation === null ? body.salutation : undefined;
+    const tags: string[] | undefined = Array.isArray(body.tags)
       ? body.tags.filter((value: unknown): value is string => typeof value === "string").map((value: string) => value.trim()).filter(Boolean)
       : undefined;
 
-    if (!contactId) {
+    if (!contactId && !contactIds?.length) {
       return NextResponse.json({ error: "A contact id is required." }, { status: 400 });
+    }
+
+    const data = {
+      status: status !== undefined ? status : undefined,
+      notes: notes !== undefined ? notes : undefined,
+      salutation: salutation !== undefined ? salutation : undefined,
+      tags: tags !== undefined ? Array.from(new Set(tags)) : undefined,
+    };
+
+    if (contactIds?.length) {
+      await prisma.businessDevelopmentContact.updateMany({ where: { id: { in: contactIds } }, data });
+      return NextResponse.json({ updated: contactIds.length });
     }
 
     const contact = await prisma.businessDevelopmentContact.update({
       where: { id: contactId },
-      data: {
-        status: status !== undefined ? status : undefined,
-        notes: notes !== undefined ? notes : undefined,
-        tags: tags !== undefined ? Array.from(new Set(tags)) : undefined,
-      },
+      data,
     });
 
     return NextResponse.json({ contact });

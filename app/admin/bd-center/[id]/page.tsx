@@ -30,6 +30,7 @@ export default async function BDContactDetailPage({ params }: { params: Promise<
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact name</p><p className="mt-1 text-sm font-semibold text-slate-900">{contact.contactName ?? "Not provided"}</p></div>
             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job title</p><p className="mt-1 text-sm font-semibold text-slate-900">{contact.jobTitle ?? "Not provided"}</p></div>
+            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Email greeting</p><p className="mt-1 text-sm font-semibold text-slate-900">{contact.salutation === "DOCTOR" ? "Dr." : contact.salutation === "NAME" ? "By name" : "Auto"}</p></div>
             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</p><p className="mt-1 text-sm font-semibold text-slate-900">{contact.email ?? "Not provided"}</p></div>
             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone</p><p className="mt-1 text-sm font-semibold text-slate-900">{contact.phone ?? "Not provided"}</p></div>
             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Corporate phone</p><p className="mt-1 text-sm font-semibold text-slate-900">{contact.corporatePhone ?? "Not provided"}</p></div>

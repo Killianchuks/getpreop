@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-const formatContactName = (contactName: string | null) => {
-  const name = contactName?.trim();
+// Matches physician indicators in a job title (e.g. "Dr.", "MD", "DO", "Physician") as whole words.
+const DOCTOR_TITLE_PATTERN = /\b(dr\.?|md|do|physician|surgeon|anesthesiologist|doctor)\b/i;
+
+const formatContactName = (contact: { contactName: string | null; jobTitle: string | null; salutation: string | null }) => {
+  const name = contact.contactName?.trim();
   if (!name) return "there";
+
+  const addressAsDoctor = contact.salutation === "DOCTOR"
+    || (contact.salutation !== "NAME" && DOCTOR_TITLE_PATTERN.test(contact.jobTitle ?? ""));
+
+  if (!addressAsDoctor) return name;
   return /^(dr\.?|doctor)\b/i.test(name) ? name : `Dr. ${name}`;
 };
 
@@ -21,19 +29,20 @@ export async function POST(request: Request) {
 
     const contacts = await prisma.businessDevelopmentContact.findMany({
       where: { id: { in: contactIds } },
-      select: { id: true, email: true, contactName: true, organizationName: true },
+      select: { id: true, email: true, contactName: true, jobTitle: true, salutation: true, organizationName: true },
     });
 
     let sent = 0;
     const apiKey = process.env.MAILERSEND_API_KEY;
     const fromEmail = process.env.MAILERSEND_FROM_EMAIL ?? "contact@getpreop.com";
     const fromName = process.env.MAILERSEND_FROM_NAME ?? "GetPreOp";
+    const replyToEmail = process.env.MAILERSEND_REPLY_TO_EMAIL ?? fromEmail;
 
     for (const contact of contacts) {
       const email = contact.email?.trim();
       if (!email) continue;
 
-      const renderedContactName = formatContactName(contact.contactName);
+      const renderedContactName = formatContactName(contact);
       const renderedSubject = subject.replace(/\{\{contactName\}\}/g, renderedContactName);
       const renderedBody = messageBody
         .replace(/\{\{contactName\}\}/g, renderedContactName)
@@ -61,6 +70,7 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             from: { email: fromEmail, name: fromName },
             to: [{ email }],
+            reply_to: { email: replyToEmail, name: fromName },
             subject: renderedSubject,
             text: renderedBody,
             html: `<p>${renderedBody.replace(/\n/g, "<br />")}</p>`,

@@ -21,6 +21,7 @@ interface ContactRecord {
   country?: string | null;
   specialty?: string | null;
   organizationType?: string | null;
+  salutation?: string | null;
   tags: string[];
   status: string;
   notes?: string | null;
@@ -35,8 +36,9 @@ const defaultMessage = {
 // Matches physician indicators in a job title (e.g. "Dr.", "MD", "DO", "Physician") as whole words.
 const DOCTOR_TITLE_PATTERN = /\b(dr\.?|md|do|physician|surgeon|anesthesiologist|doctor)\b/i;
 
-const isDoctorContact = (contact: Pick<ContactRecord, "jobTitle" | "contactName">) =>
-  DOCTOR_TITLE_PATTERN.test(contact.jobTitle ?? "") || DOCTOR_TITLE_PATTERN.test(contact.contactName ?? "");
+const isDoctorContact = (contact: Pick<ContactRecord, "jobTitle" | "contactName" | "salutation">) =>
+  contact.salutation === "DOCTOR"
+  || (contact.salutation !== "NAME" && (DOCTOR_TITLE_PATTERN.test(contact.jobTitle ?? "") || DOCTOR_TITLE_PATTERN.test(contact.contactName ?? "")));
 
 export default function BDCenterPage() {
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
@@ -234,6 +236,43 @@ export default function BDCenterPage() {
       await loadContacts();
     } catch (statusError) {
       setError(statusError instanceof Error ? statusError.message : "Unable to update contact status.");
+    }
+  }
+
+  async function updateContactSalutation(contactId: string, salutation: string) {
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/bd-center", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactId, salutation: salutation === "auto" ? null : salutation }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Unable to update contact.");
+      await loadContacts();
+    } catch (salutationError) {
+      setError(salutationError instanceof Error ? salutationError.message : "Unable to update contact greeting.");
+    }
+  }
+
+  async function bulkApplySalutation(salutation: string) {
+    if (!selectedIds.length) {
+      setError("Select at least one contact to update.");
+      return;
+    }
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/bd-center", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: selectedIds, salutation: salutation === "auto" ? null : salutation }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Unable to update contacts.");
+      setFeedback(`Updated greeting for ${payload.updated ?? selectedIds.length} contacts.`);
+      await loadContacts();
+    } catch (salutationError) {
+      setError(salutationError instanceof Error ? salutationError.message : "Unable to update contact greetings.");
     }
   }
 
@@ -451,6 +490,12 @@ export default function BDCenterPage() {
                 <p className="text-xs text-slate-500">{filteredContacts.length} records</p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
+                <button type="button" onClick={() => void bulkApplySalutation("DOCTOR")} disabled={!selectedIds.length} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  Address as Dr.
+                </button>
+                <button type="button" onClick={() => void bulkApplySalutation("NAME")} disabled={!selectedIds.length} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  Address by name
+                </button>
                 <button type="button" onClick={deleteSelectedContacts} disabled={!selectedIds.length || deleting} className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
                   {deleting ? "Deleting..." : `Delete selected${selectedIds.length ? ` (${selectedIds.length})` : ""}`}
                 </button>
@@ -473,6 +518,7 @@ export default function BDCenterPage() {
                     }} /></th>
                     <th className="px-4 py-3">Organization</th>
                     <th className="px-4 py-3">Contact</th>
+                    <th className="px-4 py-3">Greeting</th>
                     <th className="px-4 py-3">Organization type</th>
                     <th className="px-4 py-3">Corporate phone</th>
                     <th className="px-4 py-3">Status</th>
@@ -488,6 +534,13 @@ export default function BDCenterPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-800">{contact.contactName ?? "Unknown contact"}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <select value={contact.salutation ?? "auto"} onChange={(event) => void updateContactSalutation(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
+                          <option value="auto">Auto ({isDoctorContact(contact) ? "Dr." : "Name"})</option>
+                          <option value="DOCTOR">Dr.</option>
+                          <option value="NAME">By name</option>
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{contact.organizationType ?? "Not classified"}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">{contact.corporatePhone ?? contact.phone ?? "No phone"}</td>
