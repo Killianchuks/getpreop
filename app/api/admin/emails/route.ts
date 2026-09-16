@@ -3,42 +3,74 @@ import { prisma } from "@/lib/db";
 import { sendDeliverabilityTestEmail, sendDeliverableEmail, EmailCategory } from "@/lib/email-service";
 import type { Prisma } from "@prisma/client";
 
+function buildEmailLogWhereInput(params: {
+  search?: string;
+  status?: string;
+  category?: string;
+  excludeSentOrDelivered?: boolean;
+  excludeSent?: boolean;
+  excludeDelivered?: boolean;
+}): Prisma.EmailLogWhereInput {
+  const where: Prisma.EmailLogWhereInput = {};
+  const search = params.search?.trim() || "";
+  const status = params.status || "all";
+  const category = params.category || "all";
+
+  if (search) {
+    where.OR = [
+      { recipientEmail: { contains: search, mode: "insensitive" } },
+      { recipientName: { contains: search, mode: "insensitive" } },
+      { subject: { contains: search, mode: "insensitive" } },
+      { providerMessageId: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  if (params.excludeSentOrDelivered || status === "EXCLUDE_SENT_OR_DELIVERED") {
+    where.status = { notIn: ["SENT", "DELIVERED", "OPENED", "CLICKED"] };
+  } else if (params.excludeSent || status === "EXCLUDE_SENT") {
+    where.status = { not: "SENT" };
+  } else if (params.excludeDelivered || status === "EXCLUDE_DELIVERED") {
+    where.status = { notIn: ["DELIVERED", "OPENED", "CLICKED"] };
+  } else if (status !== "all") {
+    if (status === "UNREAD") {
+      where.status = { notIn: ["OPENED", "CLICKED"] };
+    } else if (status === "READ") {
+      where.status = { in: ["OPENED", "CLICKED"] };
+    } else if (status === "DELIVERED") {
+      where.status = { in: ["DELIVERED", "OPENED", "CLICKED"] };
+    } else {
+      where.status = status as Prisma.EnumEmailDeliveryStatusFilter["equals"];
+    }
+  }
+
+  if (category !== "all") {
+    where.category = category;
+  }
+
+  return where;
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const search = url.searchParams.get("search")?.trim() || "";
     const status = url.searchParams.get("status") || "all";
     const category = url.searchParams.get("category") || "all";
+    const excludeSentOrDelivered = url.searchParams.get("excludeSentOrDelivered") === "true";
+    const excludeSent = url.searchParams.get("excludeSent") === "true";
+    const excludeDelivered = url.searchParams.get("excludeDelivered") === "true";
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 200);
     const page = Math.max(Number(url.searchParams.get("page") || 1), 1);
     const skip = (page - 1) * limit;
 
-    const where: Prisma.EmailLogWhereInput = {};
-
-    if (search) {
-      where.OR = [
-        { recipientEmail: { contains: search, mode: "insensitive" } },
-        { recipientName: { contains: search, mode: "insensitive" } },
-        { subject: { contains: search, mode: "insensitive" } },
-        { providerMessageId: { contains: search, mode: "insensitive" } },
-      ];
-    }
-
-    if (status !== "all") {
-      if (status === "UNREAD") {
-        where.status = { notIn: ["OPENED", "CLICKED"] };
-      } else if (status === "READ") {
-        where.status = { in: ["OPENED", "CLICKED"] };
-      } else if (status === "DELIVERED") {
-        where.status = { in: ["DELIVERED", "OPENED", "CLICKED"] };
-      } else {
-        where.status = status as Prisma.EnumEmailDeliveryStatusFilter["equals"];
-      }
-    }
-
-    if (category !== "all") {
-      where.category = category;
-    }
+    const where = buildEmailLogWhereInput({
+      search,
+      status,
+      category,
+      excludeSentOrDelivered,
+      excludeSent,
+      excludeDelivered,
+    });
 
     const [logs, total, totalCount, deliveredCount, openedCount, clickedCount, bouncedCount, spamCount, failedCount] = await Promise.all([
       prisma.emailLog.findMany({
@@ -203,33 +235,18 @@ export async function DELETE(request: Request) {
       const search = typeof body.search === "string" ? body.search.trim() : "";
       const status = typeof body.status === "string" ? body.status : "all";
       const category = typeof body.category === "string" ? body.category : "all";
+      const excludeSentOrDelivered = Boolean(body.excludeSentOrDelivered);
+      const excludeSent = Boolean(body.excludeSent);
+      const excludeDelivered = Boolean(body.excludeDelivered);
 
-      const where: Prisma.EmailLogWhereInput = {};
-
-      if (search) {
-        where.OR = [
-          { recipientEmail: { contains: search, mode: "insensitive" } },
-          { recipientName: { contains: search, mode: "insensitive" } },
-          { subject: { contains: search, mode: "insensitive" } },
-          { providerMessageId: { contains: search, mode: "insensitive" } },
-        ];
-      }
-
-      if (status !== "all") {
-        if (status === "UNREAD") {
-          where.status = { notIn: ["OPENED", "CLICKED"] };
-        } else if (status === "READ") {
-          where.status = { in: ["OPENED", "CLICKED"] };
-        } else if (status === "DELIVERED") {
-          where.status = { in: ["DELIVERED", "OPENED", "CLICKED"] };
-        } else {
-          where.status = status as Prisma.EnumEmailDeliveryStatusFilter["equals"];
-        }
-      }
-
-      if (category !== "all") {
-        where.category = category;
-      }
+      const where = buildEmailLogWhereInput({
+        search,
+        status,
+        category,
+        excludeSentOrDelivered,
+        excludeSent,
+        excludeDelivered,
+      });
 
       const matchingLogs = await prisma.emailLog.findMany({
         where,

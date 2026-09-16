@@ -78,6 +78,7 @@ export default function EmailTrackingPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [excludeSentDelivered, setExcludeSentDelivered] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedLog, setSelectedLog] = useState<EmailLogItem | null>(null);
   const [previewTab, setPreviewTab] = useState<"preview" | "text" | "details">("preview");
@@ -101,6 +102,7 @@ export default function EmailTrackingPage() {
       if (search.trim()) params.set("search", search.trim());
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (categoryFilter !== "all") params.set("category", categoryFilter);
+      if (excludeSentDelivered) params.set("excludeSentOrDelivered", "true");
       params.set("limit", "100");
 
       const res = await fetch(`/api/admin/emails?${params.toString()}`);
@@ -116,7 +118,7 @@ export default function EmailTrackingPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, categoryFilter]);
+  }, [search, statusFilter, categoryFilter, excludeSentDelivered]);
 
   useEffect(() => {
     fetchEmailData();
@@ -125,7 +127,7 @@ export default function EmailTrackingPage() {
   // Clear selections when filters change
   useEffect(() => {
     setSelectedIds([]);
-  }, [search, statusFilter, categoryFilter]);
+  }, [search, statusFilter, categoryFilter, excludeSentDelivered]);
 
   async function handleSendTest(e: React.FormEvent) {
     e.preventDefault();
@@ -224,6 +226,7 @@ export default function EmailTrackingPage() {
       search ? `matching "${search}"` : "",
       statusFilter !== "all" ? `with status "${statusFilter}"` : "",
       categoryFilter !== "all" ? `in category "${categoryFilter}"` : "",
+      excludeSentDelivered ? "excluding sent & delivered" : "",
     ].filter(Boolean).join(", ") || "all";
 
     if (!window.confirm(`Delete ALL ${totalFiltered} email record(s) ${filterDesc}? This cannot be undone.`)) return;
@@ -238,6 +241,7 @@ export default function EmailTrackingPage() {
           search: search.trim(),
           status: statusFilter,
           category: categoryFilter,
+          excludeSentOrDelivered: excludeSentDelivered,
         }),
       });
       const data = await res.json();
@@ -535,6 +539,9 @@ export default function EmailTrackingPage() {
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-teal-700 focus:outline-none"
             >
               <option value="all">All Delivery & Read Statuses</option>
+              <option value="EXCLUDE_SENT_OR_DELIVERED">Exclude Sent & Delivered (Issues Only)</option>
+              <option value="EXCLUDE_SENT">Exclude Sent</option>
+              <option value="EXCLUDE_DELIVERED">Exclude Delivered (Opened / Clicked)</option>
               <option value="READ">Read (Opened / Clicked)</option>
               <option value="UNREAD">Unread</option>
               <option value="DELIVERED">Delivered</option>
@@ -558,6 +565,22 @@ export default function EmailTrackingPage() {
               <option value="NOTIFICATION">Notifications</option>
               <option value="TEST">Deliverability Tests</option>
             </select>
+
+            <label
+              className={`flex items-center gap-1.5 cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold transition select-none ${
+                excludeSentDelivered
+                  ? "border-rose-300 bg-rose-50 text-rose-800"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={excludeSentDelivered}
+                onChange={(e) => setExcludeSentDelivered(e.target.checked)}
+                className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+              />
+              <span>Exclude Sent / Delivered</span>
+            </label>
           </div>
         </div>
 
