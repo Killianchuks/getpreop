@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { buildBDOutreachEmailContent } from "@/lib/email-templates";
 import { sendDeliverableEmail } from "@/lib/email-service";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 // Matches physician indicators in a job title (e.g. "Dr.", "MD", "DO", "Physician") as whole words.
 const DOCTOR_TITLE_PATTERN = /\b(dr\.?|md|do|physician|surgeon|anesthesiologist|doctor)\b/i;
 

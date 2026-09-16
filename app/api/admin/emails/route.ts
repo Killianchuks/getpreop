@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { sendDeliverabilityTestEmail, sendDeliverableEmail, EmailCategory } from "@/lib/email-service";
 import type { Prisma } from "@prisma/client";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 function buildEmailLogWhereInput(params: {
   search?: string;
   status?: string;
