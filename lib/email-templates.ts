@@ -5,10 +5,16 @@
  * CAN-SPAM physical address footer, and List-Unsubscribe links.
  */
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.getpreop.com";
+function getCleanEnv(key: string, fallback: string): string {
+  const val = process.env[key];
+  if (!val) return fallback;
+  return val.replace(/\\n/g, "").replace(/[\r\n]+/g, "").trim() || fallback;
+}
+
+const APP_URL = getCleanEnv("NEXT_PUBLIC_APP_URL", "https://www.getpreop.com");
 const COMPANY_NAME = "GetPreOp";
 const PHYSICAL_ADDRESS = "GetPreOp Inc., 100 Medical Center Way, Suite 400, Boston, MA 02115";
-const SUPPORT_EMAIL = process.env.MAILERSEND_REPLY_TO_EMAIL || "support@getpreop.com";
+const SUPPORT_EMAIL = getCleanEnv("MAILERSEND_REPLY_TO_EMAIL", "support@getpreop.com");
 
 interface EmailLayoutOptions {
   title: string;

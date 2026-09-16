@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import { prisma } from "@/lib/db";
-import { buildDeliverableEmailLayout, buildTestEmailContent } from "@/lib/email-templates";
+import { buildTestEmailContent } from "@/lib/email-templates";
 
 export type EmailCategory = "VERIFICATION_CODE" | "PATIENT_UPLOAD" | "BD_OUTREACH" | "TEST" | "NOTIFICATION" | "GENERAL";
 
@@ -27,18 +27,19 @@ export interface SendEmailResult {
   developmentCode?: string;
 }
 
-const DEFAULT_FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL || "contact@getpreop.com";
-const DEFAULT_FROM_NAME = process.env.MAILERSEND_FROM_NAME || "GetPreOp";
-const DEFAULT_REPLY_TO = process.env.MAILERSEND_REPLY_TO_EMAIL || "support@getpreop.com";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.getpreop.com";
+function getCleanEnv(key: string, fallback = ""): string {
+  const val = process.env[key];
+  if (!val) return fallback;
+  return val.replace(/\\n/g, "").replace(/[\r\n]+/g, "").trim() || fallback;
+}
 
 function hasSmtpConfiguration() {
   return Boolean(
-    process.env.SMTP_HOST
-      && process.env.SMTP_PORT
-      && process.env.SMTP_USER
-      && process.env.SMTP_PASS
-      && process.env.SMTP_FROM,
+    getCleanEnv("SMTP_HOST")
+      && getCleanEnv("SMTP_PORT")
+      && getCleanEnv("SMTP_USER")
+      && getCleanEnv("SMTP_PASS")
+      && getCleanEnv("SMTP_FROM"),
   );
 }
 
@@ -46,7 +47,8 @@ function hasSmtpConfiguration() {
  * Standard RFC 8058 and Anti-Spam headers to ensure highest inbox delivery rates.
  */
 function buildDeliverabilityHeaders(recipientEmail: string, logId: string) {
-  const unsubscribeUrl = `${APP_URL}/api/email/unsubscribe?email=${encodeURIComponent(recipientEmail)}&id=${logId}`;
+  const appUrl = getCleanEnv("NEXT_PUBLIC_APP_URL", "https://www.getpreop.com");
+  const unsubscribeUrl = `${appUrl}/api/email/unsubscribe?email=${encodeURIComponent(recipientEmail)}&id=${logId}`;
   return {
     "List-Unsubscribe": `<${unsubscribeUrl}>, <mailto:unsubscribe@getpreop.com?subject=unsubscribe>`,
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -61,10 +63,12 @@ function buildDeliverabilityHeaders(recipientEmail: string, logId: string) {
  */
 export async function sendDeliverableEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   const to = options.to.trim().toLowerCase();
-  const fromEmail = options.fromEmail || DEFAULT_FROM_EMAIL;
-  const fromName = options.fromName || DEFAULT_FROM_NAME;
-  const replyTo = options.replyTo || DEFAULT_REPLY_TO;
-  const apiKey = process.env.MAILERSEND_API_KEY;
+  const fromEmail = options.fromEmail?.trim() || getCleanEnv("MAILERSEND_FROM_EMAIL", "contact@getpreop.com");
+  const fromName = options.fromName?.trim() || getCleanEnv("MAILERSEND_FROM_NAME", "GetPreOp");
+  const replyTo = options.replyTo?.trim() || getCleanEnv("MAILERSEND_REPLY_TO_EMAIL", "support@getpreop.com");
+  const apiKey = getCleanEnv("MAILERSEND_API_KEY");
+
+  let lastError: string | null = null;
 
   // 1. Initial DB Log record creation
   let logId = "";
@@ -118,10 +122,6 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
           subject: options.subject,
           text: options.text,
           html: options.html,
-          headers: Object.entries(deliverabilityHeaders).map(([key, value]) => ({
-            key,
-            value,
-          })),
           tags: [options.category.toLowerCase().replace(/_/g, "-")],
         }),
       });
@@ -145,6 +145,7 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
               status: "SENT",
               providerMessageId,
               sentAt: new Date(),
+              errorMessage: null,
             },
           });
         }
@@ -158,20 +159,30 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
       }
 
       // If MailerSend returned an error status:
-      const errorMsg = `MailerSend API failed (${response.status}): ${responseText || response.statusText}`;
-      console.warn(errorMsg, "Falling back to SMTP if available.");
+      lastError = `MailerSend API failed (${response.status}): ${responseText || response.statusText}`;
+      console.warn(lastError, "Falling back to SMTP if available.");
 
       if (logId && !logId.startsWith("fallback_")) {
         await prisma.emailLog.update({
           where: { id: logId },
           data: {
             status: "FAILED",
-            errorMessage: errorMsg,
+            errorMessage: lastError,
           },
         });
       }
     } catch (apiError: unknown) {
+      lastError = apiError instanceof Error ? apiError.message : "MailerSend network request error";
       console.error("MailerSend request exception:", apiError);
+      if (logId && !logId.startsWith("fallback_")) {
+        await prisma.emailLog.update({
+          where: { id: logId },
+          data: {
+            status: "FAILED",
+            errorMessage: lastError,
+          },
+        });
+      }
     }
   }
 
@@ -179,17 +190,17 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
   if (hasSmtpConfiguration()) {
     try {
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
-        secure: process.env.SMTP_SECURE === "true",
+        host: getCleanEnv("SMTP_HOST"),
+        port: Number(getCleanEnv("SMTP_PORT")),
+        secure: getCleanEnv("SMTP_SECURE") === "true",
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: getCleanEnv("SMTP_USER"),
+          pass: getCleanEnv("SMTP_PASS"),
         },
       });
 
       const info = await transporter.sendMail({
-        from: `"${fromName}" <${process.env.SMTP_FROM || fromEmail}>`,
+        from: `"${fromName}" <${getCleanEnv("SMTP_FROM", fromEmail)}>`,
         to: options.toName ? `"${options.toName}" <${to}>` : to,
         replyTo: `"${fromName}" <${replyTo}>`,
         subject: options.subject,
@@ -222,13 +233,14 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
       };
     } catch (smtpErr: unknown) {
       const errorMsg = smtpErr instanceof Error ? smtpErr.message : "SMTP sending failed";
+      lastError = `SMTP error: ${errorMsg}`;
       console.error("SMTP error:", smtpErr);
       if (logId && !logId.startsWith("fallback_")) {
         await prisma.emailLog.update({
           where: { id: logId },
           data: {
             status: "FAILED",
-            errorMessage: errorMsg,
+            errorMessage: lastError,
           },
         });
       }
@@ -238,7 +250,7 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
         provider: "smtp",
         providerMessageId: null,
         status: "FAILED",
-        error: errorMsg,
+        error: lastError,
       };
     }
   }
@@ -267,7 +279,7 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
   }
 
   // If in production and no mail provider succeeded:
-  const failureMessage = "No email provider configured or available. Please configure MAILERSEND_API_KEY or SMTP settings.";
+  const failureMessage = lastError || "No email provider configured or available. Please configure MAILERSEND_API_KEY or SMTP settings.";
   if (logId && !logId.startsWith("fallback_")) {
     await prisma.emailLog.update({
       where: { id: logId },
