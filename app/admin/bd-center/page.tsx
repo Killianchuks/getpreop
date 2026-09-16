@@ -43,6 +43,12 @@ const isDoctorContact = (contact: Pick<ContactRecord, "jobTitle" | "contactName"
 export default function BDCenterPage() {
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [excludedIds, setExcludedIds] = useState<string[]>([]);
+  const [excludeSearch, setExcludeSearch] = useState("");
+  const [excludeStatus, setExcludeStatus] = useState("all");
+  const [excludeUnsubscribed, setExcludeUnsubscribed] = useState(true);
+  const [excludeAlreadyContacted, setExcludeAlreadyContacted] = useState(false);
+  const [excludeWithoutEmail, setExcludeWithoutEmail] = useState(true);
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -101,6 +107,60 @@ export default function BDCenterPage() {
       return matchesSearch && matchesState && matchesStatus && matchesOrganization && matchesEmail && matchesPhone && matchesRole;
     });
   }, [contacts, search, stateFilter, statusFilter, organizationFilter, emailFilter, phoneFilter, roleFilter]);
+
+  // Compute final recipients after applying exclusion filters and manual exclusions
+  const activeRecipients = useMemo(() => {
+    const baseList = selectedIds.length
+      ? contacts.filter((c) => selectedIds.includes(c.id))
+      : filteredContacts;
+
+    const excludeTerm = excludeSearch.trim().toLowerCase();
+
+    return baseList.filter((contact) => {
+      // 1. Manually toggled excluded ID
+      if (excludedIds.includes(contact.id)) return false;
+
+      // 2. Exclude by search term
+      if (excludeTerm) {
+        const matchesExcludeTerm = [
+          contact.organizationName,
+          contact.contactName,
+          contact.email,
+          contact.specialty,
+          contact.city,
+          contact.state,
+        ].some((val) => (val ?? "").toLowerCase().includes(excludeTerm));
+        if (matchesExcludeTerm) return false;
+      }
+
+      // 3. Exclude by status
+      if (excludeStatus !== "all" && contact.status === excludeStatus) {
+        return false;
+      }
+
+      // 4. Auto-exclude unsubscribed
+      if (excludeUnsubscribed && contact.status === "UNSUBSCRIBED") {
+        return false;
+      }
+
+      // 5. Auto-exclude already contacted / qualified / clients
+      if (excludeAlreadyContacted && (contact.status === "CONTACTED" || contact.status === "QUALIFIED" || contact.status === "CLIENT")) {
+        return false;
+      }
+
+      // 6. Auto-exclude missing email
+      if (excludeWithoutEmail && !contact.email?.trim()) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [selectedIds, filteredContacts, contacts, excludedIds, excludeSearch, excludeStatus, excludeUnsubscribed, excludeAlreadyContacted, excludeWithoutEmail]);
+
+  const excludedCount = useMemo(() => {
+    const totalPotential = selectedIds.length ? selectedIds.length : filteredContacts.length;
+    return Math.max(0, totalPotential - activeRecipients.length);
+  }, [selectedIds.length, filteredContacts.length, activeRecipients.length]);
 
   const pipelineCounts = useMemo(() => {
     return contacts.reduce<Record<string, number>>((counts, contact) => {
@@ -241,12 +301,15 @@ export default function BDCenterPage() {
 
   async function handleSendMessage(event: FormEvent) {
     event.preventDefault();
-    const targets = selectedIds.length ? selectedIds : filteredContacts.map((contact) => contact.id);
+    const targetIds = activeRecipients.map((contact) => contact.id);
 
-    if (!targets.length) {
-      setError("Select at least one contact before sending a message.");
+    if (!targetIds.length) {
+      setError("No valid recipient contacts to send to. Please review your selection and exclusion filters.");
       return;
     }
+
+    const confirmed = window.confirm(`Ready to dispatch message to ${targetIds.length} contact(s)${excludedCount > 0 ? ` (${excludedCount} excluded)` : ""}?`);
+    if (!confirmed) return;
 
     setError(null);
     setFeedback(null);
@@ -256,7 +319,7 @@ export default function BDCenterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contactIds: targets,
+          contactIds: targetIds,
           subject: messageSubject,
           body: messageBody,
           channel: "EMAIL",
@@ -264,11 +327,26 @@ export default function BDCenterPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Unable to send messages.");
-      setFeedback(`${payload.sent ?? 0} messages queued or sent.`);
+      setFeedback(`${payload.sent ?? 0} messages sent successfully.${payload.failed ? ` (${payload.failed} failed)` : ""}`);
       await loadContacts();
     } catch (messageError) {
       setError(messageError instanceof Error ? messageError.message : "Unable to send messages.");
     }
+  }
+
+  function toggleExcluded(id: string) {
+    setExcludedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  }
+
+  function clearAllExclusions() {
+    setExcludedIds([]);
+    setExcludeSearch("");
+    setExcludeStatus("all");
+    setExcludeUnsubscribed(true);
+    setExcludeAlreadyContacted(false);
+    setExcludeWithoutEmail(true);
   }
 
   async function updateContactStatus(contactId: string, status: string) {
@@ -530,9 +608,93 @@ export default function BDCenterPage() {
                 >
                   {clearingFailed ? "Clearing..." : "Clear failed messages"}
                 </button>
-                <button type="submit" className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-900">
-                  Send to {selectedIds.length ? selectedIds.length : filteredContacts.length} contacts
+                <button type="submit" className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-900 shadow-sm transition">
+                  Send to {activeRecipients.length} contact{activeRecipients.length === 1 ? "" : "s"}
                 </button>
+              </div>
+            </div>
+
+            {/* Exclusion Controls Panel */}
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Recipient Exclusion Rules</span>
+                  {excludedCount > 0 && (
+                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700">
+                      {excludedCount} excluded
+                    </span>
+                  )}
+                </div>
+                {(excludedIds.length > 0 || excludeSearch || excludeStatus !== "all" || excludeAlreadyContacted) && (
+                  <button
+                    type="button"
+                    onClick={clearAllExclusions}
+                    className="text-[11px] font-semibold text-teal-800 hover:text-teal-950 underline"
+                  >
+                    Reset exclusion filters
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Exclude by keyword</label>
+                  <input
+                    type="text"
+                    value={excludeSearch}
+                    onChange={(e) => setExcludeSearch(e.target.value)}
+                    placeholder="e.g. clinic, hospital, doctor..."
+                    className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600">Exclude by status</label>
+                  <select
+                    value={excludeStatus}
+                    onChange={(e) => setExcludeStatus(e.target.value)}
+                    className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                  >
+                    <option value="all">Do not exclude any status</option>
+                    <option value="CONTACTED">Exclude Contacted</option>
+                    <option value="QUALIFIED">Exclude Qualified</option>
+                    <option value="CLIENT">Exclude Client</option>
+                    <option value="UNSUBSCRIBED">Exclude Unsubscribed</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col justify-center space-y-1.5 pt-1 sm:col-span-2">
+                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={excludeUnsubscribed}
+                      onChange={(e) => setExcludeUnsubscribed(e.target.checked)}
+                      className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+                    />
+                    <span><strong>Auto-exclude Unsubscribed contacts</strong> (compliance)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={excludeAlreadyContacted}
+                      onChange={(e) => setExcludeAlreadyContacted(e.target.checked)}
+                      className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+                    />
+                    <span><strong>Exclude already contacted / qualified</strong> (fresh outreach only)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/60 pt-2 text-[11px] text-slate-600">
+                <span>
+                  <strong>Send Summary:</strong> {activeRecipients.length} will be emailed &bull; {excludedCount} excluded from this send batch.
+                </span>
+                {excludedIds.length > 0 && (
+                  <span className="font-semibold text-rose-700">
+                    ({excludedIds.length} manually excluded from table)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -592,43 +754,67 @@ export default function BDCenterPage() {
                     <th className="px-4 py-3">Corporate phone</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Email</th>
+                    <th className="px-4 py-3 text-right">Exclude / Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {loading ? <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Loading contacts…</td></tr> : filteredContacts.length === 0 ? <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">No contacts match the current filters.</td></tr> : filteredContacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(contact.id)} onChange={() => toggleSelected(contact.id)} /></td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{contact.organizationName ?? "Unspecified"}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-slate-800">{contact.contactName ?? "Unknown contact"}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <select value={contact.salutation ?? "auto"} onChange={(event) => void updateContactSalutation(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
-                          <option value="auto">Auto ({isDoctorContact(contact) ? "Dr." : "Name"})</option>
-                          <option value="DOCTOR">Dr.</option>
-                          <option value="NAME">By name</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{contact.organizationType ?? "Not classified"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{contact.corporatePhone ?? contact.phone ?? "No phone"}</td>
-                      <td className="px-4 py-3">
-                        <select value={contact.status} onChange={(event) => void updateContactStatus(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
-                          <option value="NEW">New</option>
-                          <option value="CONTACTED">Contacted</option>
-                          <option value="QUALIFIED">Qualified</option>
-                          <option value="CLIENT">Client</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{contact.email ?? "No email"}</td>
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/bd-center/${contact.id}`} className="text-xs font-semibold text-teal-700 hover:text-teal-900">
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Loading contacts…</td></tr> : filteredContacts.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No contacts match the current filters.</td></tr> : filteredContacts.map((contact) => {
+                    const isManuallyExcluded = excludedIds.includes(contact.id);
+                    const isAutoExcluded = !activeRecipients.some((r) => r.id === contact.id);
+
+                    return (
+                      <tr
+                        key={contact.id}
+                        className={`hover:bg-slate-50 transition ${isManuallyExcluded || isAutoExcluded ? "bg-slate-100/70 text-slate-400 opacity-75" : ""}`}
+                      >
+                        <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.includes(contact.id)} onChange={() => toggleSelected(contact.id)} /></td>
+                        <td className="px-4 py-3">
+                          <div className={`font-semibold ${isAutoExcluded ? "text-slate-500 line-through" : "text-slate-900"}`}>{contact.organizationName ?? "Unspecified"}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className={`font-medium ${isAutoExcluded ? "text-slate-500" : "text-slate-800"}`}>{contact.contactName ?? "Unknown contact"}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select value={contact.salutation ?? "auto"} onChange={(event) => void updateContactSalutation(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
+                            <option value="auto">Auto ({isDoctorContact(contact) ? "Dr." : "Name"})</option>
+                            <option value="DOCTOR">Dr.</option>
+                            <option value="NAME">By name</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{contact.organizationType ?? "Not classified"}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">{contact.corporatePhone ?? contact.phone ?? "No phone"}</td>
+                        <td className="px-4 py-3">
+                          <select value={contact.status} onChange={(event) => void updateContactStatus(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
+                            <option value="NEW">New</option>
+                            <option value="CONTACTED">Contacted</option>
+                            <option value="QUALIFIED">Qualified</option>
+                            <option value="CLIENT">Client</option>
+                            <option value="UNSUBSCRIBED">Unsubscribed</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{contact.email ?? "No email"}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleExcluded(contact.id)}
+                              className={`rounded px-2 py-1 text-[11px] font-semibold transition ${
+                                isManuallyExcluded
+                                  ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                              }`}
+                              title={isManuallyExcluded ? "Click to include in send batch" : "Click to exclude from send batch"}
+                            >
+                              {isManuallyExcluded ? "Excluded" : "Exclude"}
+                            </button>
+                            <Link href={`/admin/bd-center/${contact.id}`} className="text-xs font-semibold text-teal-700 hover:text-teal-900">
+                              View
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
