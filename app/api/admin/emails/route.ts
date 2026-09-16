@@ -25,7 +25,15 @@ export async function GET(request: Request) {
     }
 
     if (status !== "all") {
-      where.status = status as Prisma.EnumEmailDeliveryStatusFilter["equals"];
+      if (status === "UNREAD") {
+        where.status = { notIn: ["OPENED", "CLICKED"] };
+      } else if (status === "READ") {
+        where.status = { in: ["OPENED", "CLICKED"] };
+      } else if (status === "DELIVERED") {
+        where.status = { in: ["DELIVERED", "OPENED", "CLICKED"] };
+      } else {
+        where.status = status as Prisma.EnumEmailDeliveryStatusFilter["equals"];
+      }
     }
 
     if (category !== "all") {

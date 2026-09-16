@@ -92,6 +92,24 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
     logId = `fallback_${Date.now()}`;
   }
 
+  // Inject tracking pixel into HTML body if not already present
+  let processedHtml = options.html;
+  if (logId && !logId.startsWith("fallback_")) {
+    const appUrl = getCleanEnv("NEXT_PUBLIC_APP_URL", "https://www.getpreop.com");
+    const trackingPixel = `<img src="${appUrl}/api/email/track-open?id=${logId}" alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin:0!important;padding:0!important;display:block;" />`;
+    if (!processedHtml.includes("/api/email/track-open")) {
+      processedHtml = processedHtml.includes("</body>")
+        ? processedHtml.replace("</body>", `${trackingPixel}</body>`)
+        : `${processedHtml}${trackingPixel}`;
+    }
+
+    // Update the stored HTML with the tracking pixel
+    await prisma.emailLog.update({
+      where: { id: logId },
+      data: { bodyHtml: processedHtml },
+    }).catch(() => {});
+  }
+
   const deliverabilityHeaders = buildDeliverabilityHeaders(to, logId);
 
   // 2. Primary Provider: MailerSend REST API
@@ -121,7 +139,7 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
           },
           subject: options.subject,
           text: options.text,
-          html: options.html,
+          html: processedHtml,
           tags: [options.category.toLowerCase().replace(/_/g, "-")],
         }),
       });
@@ -304,9 +322,11 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
  * Sends a live deliverability test email to check SPF, DKIM, and inbox placement.
  */
 export async function sendDeliverabilityTestEmail(toEmail: string) {
-  const { html, text } = buildTestEmailContent(toEmail);
+  const recipientEmail = toEmail.trim().toLowerCase();
+  const { html, text } = buildTestEmailContent(recipientEmail);
+
   return sendDeliverableEmail({
-    to: toEmail,
+    to: recipientEmail,
     subject: "GetPreOp Email Deliverability & SPF/DKIM Test",
     html,
     text,

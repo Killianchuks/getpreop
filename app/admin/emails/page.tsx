@@ -398,11 +398,13 @@ export default function EmailTrackingPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-teal-700 focus:outline-none"
             >
-              <option value="all">All Statuses</option>
-              <option value="SENT">Sent</option>
+              <option value="all">All Delivery & Read Statuses</option>
+              <option value="READ">Read (Opened / Clicked)</option>
+              <option value="UNREAD">Unread</option>
               <option value="DELIVERED">Delivered</option>
               <option value="OPENED">Opened</option>
-              <option value="CLICKED">Clicked</option>
+              <option value="CLICKED">Link Clicked</option>
+              <option value="SENT">Sent</option>
               <option value="BOUNCED">Bounced</option>
               <option value="SPAM_COMPLAINT">Spam Complaint</option>
               <option value="FAILED">Failed</option>

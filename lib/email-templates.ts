@@ -22,13 +22,15 @@ interface EmailLayoutOptions {
   contentHtml: string;
   contentText: string;
   recipientEmail?: string;
+  logId?: string;
   showUnsubscribe?: boolean;
   categoryNote?: string;
 }
 
 export function buildDeliverableEmailLayout(options: EmailLayoutOptions): { html: string; text: string } {
-  const unsubscribeUrl = `${APP_URL}/api/email/unsubscribe?email=${encodeURIComponent(options.recipientEmail ?? "")}`;
+  const unsubscribeUrl = `${APP_URL}/api/email/unsubscribe?email=${encodeURIComponent(options.recipientEmail ?? "")}${options.logId ? `&id=${options.logId}` : ""}`;
   const categoryNote = options.categoryNote ?? "This is an important transactional message regarding your GetPreOp account or clinical care.";
+  const trackingPixel = options.logId ? `<img src="${APP_URL}/api/email/track-open?id=${options.logId}" alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin:0!important;padding:0!important;display:block;" />` : "";
 
   const html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
@@ -110,6 +112,7 @@ export function buildDeliverableEmailLayout(options: EmailLayoutOptions): { html
       </td>
     </tr>
   </table>
+  ${trackingPixel}
 </body>
 </html>`;
 
@@ -131,7 +134,7 @@ export function buildDeliverableEmailLayout(options: EmailLayoutOptions): { html
   return { html, text };
 }
 
-export function buildVerificationEmailContent(code: string, recipientEmail: string) {
+export function buildVerificationEmailContent(code: string, recipientEmail: string, logId?: string) {
   const title = "Verify your GetPreOp account";
   const preheader = `Your 6-digit verification code is ${code}. It expires in 15 minutes.`;
 
@@ -165,6 +168,7 @@ export function buildVerificationEmailContent(code: string, recipientEmail: stri
     contentHtml,
     contentText,
     recipientEmail,
+    logId,
     showUnsubscribe: false,
     categoryNote: "This security verification code was requested for your GetPreOp account.",
   });
@@ -179,9 +183,13 @@ export function buildPatientUploadEmailContent(input: {
   modality: string | null;
   fileName: string | null;
   reference: string;
+  logId?: string;
 }) {
   const title = `New Pre-Op Document Uploaded: ${input.title}`;
   const preheader = `A new pre-operative clinical document has been uploaded for reference ${input.reference}.`;
+  const portalUrl = input.logId
+    ? `${APP_URL}/api/email/track-click?id=${input.logId}&url=${encodeURIComponent(`${APP_URL}/patients/portal`)}`
+    : `${APP_URL}/patients/portal`;
 
   const contentHtml = `
     <h2 style="font-size:18px;font-weight:700;color:#0f172a;margin-top:0;margin-bottom:12px;">Pre-Op Document Update</h2>
@@ -211,7 +219,7 @@ export function buildPatientUploadEmailContent(input: {
     <p style="margin:16px 0 0 0;">Please log in to your patient portal to review your case status, optimization checklist, and anesthesia readiness plan.</p>
     
     <div style="margin:24px 0 12px 0;">
-      <a href="${APP_URL}/patients/portal" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">View Patient Portal</a>
+      <a href="${portalUrl}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">View Patient Portal</a>
     </div>
   `;
 
@@ -236,6 +244,7 @@ export function buildPatientUploadEmailContent(input: {
     contentHtml,
     contentText,
     recipientEmail: input.patientEmail,
+    logId: input.logId,
     showUnsubscribe: false,
     categoryNote: "You are receiving this clinical notification regarding your scheduled preoperative case.",
   });
@@ -247,8 +256,13 @@ export function buildBDOutreachEmailContent(input: {
   organizationName: string;
   subject: string;
   messageBody: string;
+  logId?: string;
 }) {
   const preheader = input.messageBody.slice(0, 100).replace(/\n/g, " ");
+
+  const siteUrl = input.logId
+    ? `${APP_URL}/api/email/track-click?id=${input.logId}&url=${encodeURIComponent(APP_URL)}`
+    : APP_URL;
 
   const formattedHtmlBody = input.messageBody
     .split("\n\n")
@@ -261,7 +275,7 @@ export function buildBDOutreachEmailContent(input: {
     </div>
     <div style="margin:24px 0 0 0;padding-top:16px;border-top:1px solid #e2e8f0;">
       <p style="margin:0;font-weight:600;color:#0f172a;">GetPreOp Partnerships Team</p>
-      <p style="margin:2px 0 0 0;font-size:13px;color:#64748b;">Virtual Anesthesiology Preoperative Care &bull; <a href="${APP_URL}" style="color:#0f766e;">getpreop.com</a></p>
+      <p style="margin:2px 0 0 0;font-size:13px;color:#64748b;">Virtual Anesthesiology Preoperative Care &bull; <a href="${siteUrl}" style="color:#0f766e;text-decoration:underline;">getpreop.com</a></p>
     </div>
   `;
 
@@ -271,14 +285,19 @@ export function buildBDOutreachEmailContent(input: {
     contentHtml,
     contentText: input.messageBody,
     recipientEmail: input.recipientEmail,
+    logId: input.logId,
     showUnsubscribe: true,
     categoryNote: `You are receiving this partnership outreach from GetPreOp regarding ${input.organizationName || "preoperative coordination"}.`,
   });
 }
 
-export function buildTestEmailContent(recipientEmail: string) {
+export function buildTestEmailContent(recipientEmail: string, logId?: string) {
   const title = "GetPreOp Deliverability Test Email";
   const preheader = "Verification of SPF, DKIM, DMARC, and email inbox delivery.";
+
+  const testClickUrl = logId
+    ? `${APP_URL}/api/email/track-click?id=${logId}&url=${encodeURIComponent(APP_URL)}`
+    : APP_URL;
 
   const contentHtml = `
     <h2 style="font-size:18px;font-weight:700;color:#0f172a;margin-top:0;margin-bottom:12px;">Email Delivery & Authentication Test</h2>
@@ -287,10 +306,14 @@ export function buildTestEmailContent(recipientEmail: string) {
     <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
       <ul style="margin:0;padding-left:20px;color:#334155;font-size:14px;line-height:1.8;">
         <li><strong>MIME Multipart / Alternative:</strong> Full HTML + Plain Text synchronization</li>
-        <li><strong>RFC 8058 One-Click List-Unsubscribe:</strong> Configured for Gmail and Yahoo compliance</li>
-        <li><strong>Anti-Spam Headers:</strong> Feedback-ID, X-Entity-Ref-ID, and Reply-To verification</li>
+        <li><strong>Open Tracking:</strong> 1x1 invisible pixel records when recipient reads message</li>
+        <li><strong>Click Tracking:</strong> Instant redirect verifying link interactions</li>
         <li><strong>CAN-SPAM / GDPR Compliance:</strong> Verified physical address and clear opt-out</li>
       </ul>
+    </div>
+
+    <div style="margin:20px 0;">
+      <a href="${testClickUrl}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;font-size:13px;">Test Click Tracking Link &rarr;</a>
     </div>
 
     <p style="margin:16px 0 0 0;font-size:14px;color:#64748b;">If you see this in your primary inbox, your sending domain authentication (SPF/DKIM/DMARC) is working properly.</p>
@@ -301,9 +324,10 @@ export function buildTestEmailContent(recipientEmail: string) {
     "--------------------------------------------",
     "This test verifies that transactional emails are properly configured with:",
     "- MIME multipart/alternative structure",
-    "- RFC 8058 List-Unsubscribe headers",
-    "- Anti-Spam compliance headers and plain text fallbacks",
+    "- Open and Click delivery tracking",
     "- Verified physical address footer",
+    "",
+    `Test link: ${APP_URL}`,
   ].join("\n");
 
   return buildDeliverableEmailLayout({
@@ -312,6 +336,7 @@ export function buildTestEmailContent(recipientEmail: string) {
     contentHtml,
     contentText,
     recipientEmail,
+    logId,
     showUnsubscribe: false,
     categoryNote: "This is an automated system test message from the GetPreOp administration panel.",
   });
