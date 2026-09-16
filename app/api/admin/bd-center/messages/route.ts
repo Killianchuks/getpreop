@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildBDOutreachEmailContent } from "@/lib/email-templates";
-import { sendDeliverableEmail } from "@/lib/email-service";
+import { sendDeliverableEmail, sendDeliverableBulkEmails } from "@/lib/email-service";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // Action: Retry failed messages
     if (action === "retry_failed") {
-      const limit = typeof body.limit === "number" ? Math.min(body.limit, 100) : 50;
+      const limit = typeof body.limit === "number" ? Math.min(body.limit, 400) : 100;
       const failedMessages = await prisma.businessDevelopmentMessage.findMany({
         where: { status: "FAILED" },
         include: {
@@ -45,11 +45,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ sent: 0, message: "No failed messages to retry." });
       }
 
-      let sent = 0;
-      let failed = 0;
-
-      for (let i = 0; i < failedMessages.length; i++) {
-        const msg = failedMessages[i];
+      const bulkItems = [];
+      for (const msg of failedMessages) {
         const email = msg.contact?.email?.trim().toLowerCase();
         if (!email) continue;
 
@@ -62,13 +59,15 @@ export async function POST(request: Request) {
           messageBody: msg.body,
         });
 
-        const sendResult = await sendDeliverableEmail({
+        bulkItems.push({
           to: email,
           toName: renderedContactName,
           subject: msg.subject,
           html,
           text,
-          category: "BD_OUTREACH",
+          category: "BD_OUTREACH" as const,
+          bdMessageId: msg.id,
+          contactId: msg.contact.id,
           metadata: {
             contactId: msg.contact.id,
             bdMessageId: msg.id,
@@ -76,47 +75,16 @@ export async function POST(request: Request) {
             isRetry: true,
           },
         });
-
-        if (sendResult.success) {
-          sent++;
-          await prisma.businessDevelopmentMessage.update({
-            where: { id: msg.id },
-            data: {
-              status: "SENT",
-              providerMessageId: sendResult.providerMessageId,
-              emailLogId: sendResult.logId,
-              errorMessage: null,
-              sentAt: new Date(),
-            },
-          });
-          await prisma.businessDevelopmentContact.update({
-            where: { id: msg.contact.id },
-            data: { status: "CONTACTED", lastContactedAt: new Date() },
-          });
-        } else {
-          failed++;
-          await prisma.businessDevelopmentMessage.update({
-            where: { id: msg.id },
-            data: {
-              status: "FAILED",
-              errorMessage: sendResult.error || "Retry failed",
-            },
-          });
-        }
-
-        // Rate-limit throttle: pause 125ms (~8 req/sec) to stay comfortably under the 10 req/sec limit
-        if (i < failedMessages.length - 1) {
-          await sleep(125);
-        }
       }
 
+      const bulkResult = await sendDeliverableBulkEmails(bulkItems);
       const remainingFailed = await prisma.businessDevelopmentMessage.count({ where: { status: "FAILED" } });
 
       return NextResponse.json({
-        sent,
-        failed,
+        sent: bulkResult.sent,
+        failed: bulkResult.failed,
         remainingFailed,
-        message: `Processed ${sent} sent, ${failed} failed. ${remainingFailed} remaining to retry.`,
+        message: `Processed ${bulkResult.sent} sent, ${bulkResult.failed} failed. ${remainingFailed} remaining to retry.`,
       });
     }
 
@@ -147,14 +115,15 @@ export async function POST(request: Request) {
       },
     });
 
-    let sent = 0;
-    let failed = 0;
     let skipped = 0;
+    const eligibleContacts = [];
 
-    for (let i = 0; i < contacts.length; i++) {
-      const contact = contacts[i];
+    for (const contact of contacts) {
       const email = contact.email?.trim().toLowerCase();
-      if (!email) continue;
+      if (!email) {
+        skipped++;
+        continue;
+      }
 
       if (contact.status === "UNSUBSCRIBED") {
         skipped++;
@@ -171,6 +140,22 @@ export async function POST(request: Request) {
         continue;
       }
 
+      eligibleContacts.push(contact);
+    }
+
+    if (eligibleContacts.length === 0) {
+      return NextResponse.json({
+        sent: 0,
+        failed: 0,
+        skipped,
+        message: `0 messages sent. All ${skipped} selected contact(s) were excluded as already sent/delivered/unsubscribed.`,
+      });
+    }
+
+    // 1. Pre-create BD message records
+    const bulkItems = [];
+    for (const contact of eligibleContacts) {
+      const email = contact.email!.trim().toLowerCase();
       const renderedContactName = formatContactName(contact);
       const renderedSubject = subject.replace(/\{\{contactName\}\}/g, renderedContactName);
       const renderedBody = messageBody
@@ -195,56 +180,40 @@ export async function POST(request: Request) {
         messageBody: renderedBody,
       });
 
-      const sendResult = await sendDeliverableEmail({
+      bulkItems.push({
         to: email,
         toName: renderedContactName,
         subject: renderedSubject,
         html,
         text,
-        category: "BD_OUTREACH",
+        category: "BD_OUTREACH" as const,
+        bdMessageId: messageRecord.id,
+        contactId: contact.id,
         metadata: {
           contactId: contact.id,
           bdMessageId: messageRecord.id,
           organizationName: contact.organizationName,
         },
       });
+    }
 
-      const finalStatus = sendResult.success ? "SENT" : "FAILED";
-      if (sendResult.success) {
-        sent += 1;
-      } else {
-        failed += 1;
-      }
+    // 2. Chunk in batches of 400 and dispatch via /v1/bulk-email
+    let totalSent = 0;
+    let totalFailed = 0;
+    const chunkSize = 400;
 
-      await prisma.businessDevelopmentMessage.update({
-        where: { id: messageRecord.id },
-        data: {
-          status: finalStatus,
-          providerMessageId: sendResult.providerMessageId,
-          emailLogId: sendResult.logId,
-          errorMessage: sendResult.error || null,
-          sentAt: sendResult.success ? new Date() : null,
-        },
-      });
-
-      if (sendResult.success) {
-        await prisma.businessDevelopmentContact.update({
-          where: { id: contact.id },
-          data: { status: "CONTACTED", lastContactedAt: new Date() },
-        });
-      }
-
-      // Rate-limit throttle: pause 125ms (~8 req/sec) to stay comfortably under the 10 req/sec limit
-      if (i < contacts.length - 1) {
-        await sleep(125);
-      }
+    for (let i = 0; i < bulkItems.length; i += chunkSize) {
+      const chunk = bulkItems.slice(i, i + chunkSize);
+      const bulkResult = await sendDeliverableBulkEmails(chunk);
+      totalSent += bulkResult.sent;
+      totalFailed += bulkResult.failed;
     }
 
     return NextResponse.json({
-      sent,
-      failed,
+      sent: totalSent,
+      failed: totalFailed,
       skipped,
-      message: `${sent} message${sent === 1 ? "" : "s"} processed successfully.${skipped > 0 ? ` (${skipped} excluded as already sent/delivered/unsubscribed)` : ""}${failed > 0 ? ` (${failed} failed, you can retry from BD Center)` : ""}`,
+      message: `${totalSent} message${totalSent === 1 ? "" : "s"} sent successfully.${skipped > 0 ? ` (${skipped} excluded as already sent/delivered/unsubscribed)` : ""}${totalFailed > 0 ? ` (${totalFailed} failed)` : ""}`,
     });
   } catch (error) {
     console.error("BD messaging failed:", error);

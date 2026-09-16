@@ -27,6 +27,21 @@ export interface SendEmailResult {
   developmentCode?: string;
 }
 
+export interface BulkSendItem {
+  to: string;
+  toName?: string;
+  subject: string;
+  html: string;
+  text: string;
+  category: EmailCategory;
+  metadata?: Record<string, unknown>;
+  replyTo?: string;
+  fromName?: string;
+  fromEmail?: string;
+  bdMessageId?: string;
+  contactId?: string;
+}
+
 function getCleanEnv(key: string, fallback = ""): string {
   const val = process.env[key];
   if (!val) return fallback;
@@ -345,4 +360,243 @@ export async function sendDeliverabilityTestEmail(toEmail: string) {
     category: "TEST",
     metadata: { testType: "DELIVERABILITY_VERIFICATION", timestamp: new Date().toISOString() },
   });
+}
+
+/**
+ * Sends a batch of up to 500 emails in a single HTTP request using MailerSend Bulk API (/v1/bulk-email).
+ * Bypasses the 10 requests/minute rate limit while ensuring full individual open/click tracking.
+ */
+export async function sendDeliverableBulkEmails(items: BulkSendItem[]): Promise<{
+  sent: number;
+  failed: number;
+  results: Array<{ email: string; success: boolean; logId: string; error?: string }>;
+}> {
+  if (!items.length) {
+    return { sent: 0, failed: 0, results: [] };
+  }
+
+  const apiKey = getCleanEnv("MAILERSEND_API_KEY");
+  const defaultFromEmail = getCleanEnv("MAILERSEND_FROM_EMAIL", "contact@getpreop.com");
+  const defaultFromName = getCleanEnv("MAILERSEND_FROM_NAME", "GetPreOp");
+  const defaultReplyTo = getCleanEnv("MAILERSEND_REPLY_TO_EMAIL", "support@getpreop.com");
+  const appUrl = getCleanEnv("NEXT_PUBLIC_APP_URL", "https://www.getpreop.com");
+
+  // 1. Pre-create EmailLog entries in DB so each email gets a tracking pixel and log ID
+  const preparedItems: Array<{
+    item: BulkSendItem;
+    logId: string;
+    html: string;
+  }> = [];
+
+  for (const item of items) {
+    const to = item.to.trim().toLowerCase();
+    let logId = "";
+    try {
+      const logRecord = await prisma.emailLog.create({
+        data: {
+          recipientEmail: to,
+          recipientName: item.toName || null,
+          subject: item.subject,
+          category: item.category,
+          provider: apiKey ? "mailersend" : "mock",
+          status: "SENDING",
+          bodyText: item.text,
+          bodyHtml: item.html,
+          metadata: item.metadata ? (item.metadata as object) : undefined,
+        },
+      });
+      logId = logRecord.id;
+    } catch {
+      logId = `fallback_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    }
+
+    // Embed open tracking pixel
+    let processedHtml = item.html;
+    if (logId && !logId.startsWith("fallback_")) {
+      const trackingPixel = `<img src="${appUrl}/api/email/track-open?id=${logId}" alt="" width="1" height="1" border="0" style="height:1px!important;width:1px!important;border-width:0!important;margin:0!important;padding:0!important;display:block;" />`;
+      if (!processedHtml.includes("/api/email/track-open")) {
+        processedHtml = processedHtml.includes("</body>")
+          ? processedHtml.replace("</body>", `${trackingPixel}</body>`)
+          : `${processedHtml}${trackingPixel}`;
+      }
+
+      await prisma.emailLog.update({
+        where: { id: logId },
+        data: { bodyHtml: processedHtml },
+      }).catch(() => {});
+    }
+
+    preparedItems.push({ item, logId, html: processedHtml });
+  }
+
+  // 2. Build MailerSend /v1/bulk-email payload
+  if (apiKey) {
+    const bulkPayload = preparedItems.map(({ item, html }) => {
+      const to = item.to.trim().toLowerCase();
+      const fromEmail = item.fromEmail?.trim() || defaultFromEmail;
+      const fromName = item.fromName?.trim() || defaultFromName;
+      const replyTo = item.replyTo?.trim() || defaultReplyTo;
+
+      return {
+        from: { email: fromEmail, name: fromName },
+        to: [{ email: to, name: item.toName || to }],
+        reply_to: { email: replyTo, name: fromName },
+        subject: item.subject,
+        text: item.text,
+        html,
+        tags: [item.category.toLowerCase().replace(/_/g, "-")],
+      };
+    });
+
+    try {
+      const response = await fetch("https://api.mailersend.com/v1/bulk-email", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify(bulkPayload),
+      });
+
+      const responseText = await response.text();
+      let responseJson: Record<string, unknown> = {};
+      try {
+        if (responseText) responseJson = JSON.parse(responseText);
+      } catch {
+        // non-json response
+      }
+
+      const bulkEmailId = typeof responseJson.bulk_email_id === "string" ? responseJson.bulk_email_id : `bulk_${Date.now()}`;
+
+      if (response.ok || response.status === 202) {
+        // Mark all prepared items as SENT
+        const logIds = preparedItems.map((p) => p.logId).filter((id) => !id.startsWith("fallback_"));
+        if (logIds.length > 0) {
+          await prisma.emailLog.updateMany({
+            where: { id: { in: logIds } },
+            data: {
+              status: "SENT",
+              providerMessageId: bulkEmailId,
+              sentAt: new Date(),
+              errorMessage: null,
+            },
+          });
+        }
+
+        // Update corresponding BD messages
+        const bdIds = preparedItems.map((p) => p.item.bdMessageId).filter((id): id is string => Boolean(id));
+        if (bdIds.length > 0) {
+          await prisma.businessDevelopmentMessage.updateMany({
+            where: { id: { in: bdIds } },
+            data: {
+              status: "SENT",
+              providerMessageId: bulkEmailId,
+              sentAt: new Date(),
+              errorMessage: null,
+            },
+          });
+        }
+
+        // Update corresponding BD contacts
+        const contactIds = preparedItems.map((p) => p.item.contactId).filter((id): id is string => Boolean(id));
+        if (contactIds.length > 0) {
+          await prisma.businessDevelopmentContact.updateMany({
+            where: { id: { in: contactIds } },
+            data: {
+              status: "CONTACTED",
+              lastContactedAt: new Date(),
+            },
+          });
+        }
+
+        return {
+          sent: preparedItems.length,
+          failed: 0,
+          results: preparedItems.map((p) => ({
+            email: p.item.to,
+            success: true,
+            logId: p.logId,
+          })),
+        };
+      }
+
+      // If bulk API failed
+      const errorMsg = `Bulk API error (${response.status}): ${responseText || response.statusText}`;
+      console.error(errorMsg);
+
+      const logIds = preparedItems.map((p) => p.logId).filter((id) => !id.startsWith("fallback_"));
+      if (logIds.length > 0) {
+        await prisma.emailLog.updateMany({
+          where: { id: { in: logIds } },
+          data: { status: "FAILED", errorMessage: errorMsg },
+        });
+      }
+
+      const bdIds = preparedItems.map((p) => p.item.bdMessageId).filter((id): id is string => Boolean(id));
+      if (bdIds.length > 0) {
+        await prisma.businessDevelopmentMessage.updateMany({
+          where: { id: { in: bdIds } },
+          data: { status: "FAILED", errorMessage: errorMsg },
+        });
+      }
+
+      return {
+        sent: 0,
+        failed: preparedItems.length,
+        results: preparedItems.map((p) => ({
+          email: p.item.to,
+          success: false,
+          logId: p.logId,
+          error: errorMsg,
+        })),
+      };
+    } catch (bulkErr: unknown) {
+      const errorMsg = bulkErr instanceof Error ? bulkErr.message : "Bulk API network failure";
+      console.error("Bulk API exception:", bulkErr);
+
+      const logIds = preparedItems.map((p) => p.logId).filter((id) => !id.startsWith("fallback_"));
+      if (logIds.length > 0) {
+        await prisma.emailLog.updateMany({
+          where: { id: { in: logIds } },
+          data: { status: "FAILED", errorMessage: errorMsg },
+        });
+      }
+
+      return {
+        sent: 0,
+        failed: preparedItems.length,
+        results: preparedItems.map((p) => ({
+          email: p.item.to,
+          success: false,
+          logId: p.logId,
+          error: errorMsg,
+        })),
+      };
+    }
+  }
+
+  // Non-production fallback
+  const logIds = preparedItems.map((p) => p.logId).filter((id) => !id.startsWith("fallback_"));
+  if (logIds.length > 0) {
+    await prisma.emailLog.updateMany({
+      where: { id: { in: logIds } },
+      data: {
+        status: "SENT",
+        provider: "mock",
+        providerMessageId: `mock_bulk_${Date.now()}`,
+        sentAt: new Date(),
+      },
+    });
+  }
+
+  return {
+    sent: preparedItems.length,
+    failed: 0,
+    results: preparedItems.map((p) => ({
+      email: p.item.to,
+      success: true,
+      logId: p.logId,
+    })),
+  };
 }
