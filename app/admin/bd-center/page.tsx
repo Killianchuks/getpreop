@@ -25,6 +25,11 @@ interface ContactRecord {
   tags: string[];
   status: string;
   notes?: string | null;
+  lastContactedAt?: string | null;
+  hasSentMessage?: boolean;
+  hasDeliveredMessage?: boolean;
+  messagesCount?: number;
+  lastMessageStatus?: string | null;
   createdAt: string;
 }
 
@@ -46,8 +51,9 @@ export default function BDCenterPage() {
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
   const [excludeSearch, setExcludeSearch] = useState("");
   const [excludeStatus, setExcludeStatus] = useState("all");
+  const [excludeSentDelivered, setExcludeSentDelivered] = useState(true);
   const [excludeUnsubscribed, setExcludeUnsubscribed] = useState(true);
-  const [excludeAlreadyContacted, setExcludeAlreadyContacted] = useState(false);
+  const [excludeAlreadyContacted, setExcludeAlreadyContacted] = useState(true);
   const [excludeWithoutEmail, setExcludeWithoutEmail] = useState(true);
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
@@ -138,24 +144,29 @@ export default function BDCenterPage() {
         return false;
       }
 
-      // 4. Auto-exclude unsubscribed
+      // 4. Auto-exclude sent or delivered messages
+      if (excludeSentDelivered && (contact.hasSentMessage || contact.hasDeliveredMessage || contact.lastContactedAt)) {
+        return false;
+      }
+
+      // 5. Auto-exclude unsubscribed
       if (excludeUnsubscribed && contact.status === "UNSUBSCRIBED") {
         return false;
       }
 
-      // 5. Auto-exclude already contacted / qualified / clients
+      // 6. Auto-exclude already contacted / qualified / clients
       if (excludeAlreadyContacted && (contact.status === "CONTACTED" || contact.status === "QUALIFIED" || contact.status === "CLIENT")) {
         return false;
       }
 
-      // 6. Auto-exclude missing email
+      // 7. Auto-exclude missing email
       if (excludeWithoutEmail && !contact.email?.trim()) {
         return false;
       }
 
       return true;
     });
-  }, [selectedIds, filteredContacts, contacts, excludedIds, excludeSearch, excludeStatus, excludeUnsubscribed, excludeAlreadyContacted, excludeWithoutEmail]);
+  }, [selectedIds, filteredContacts, contacts, excludedIds, excludeSearch, excludeStatus, excludeSentDelivered, excludeUnsubscribed, excludeAlreadyContacted, excludeWithoutEmail]);
 
   const excludedCount = useMemo(() => {
     const totalPotential = selectedIds.length ? selectedIds.length : filteredContacts.length;
@@ -323,11 +334,12 @@ export default function BDCenterPage() {
           subject: messageSubject,
           body: messageBody,
           channel: "EMAIL",
+          excludeSentOrDelivered: excludeSentDelivered,
         }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Unable to send messages.");
-      setFeedback(`${payload.sent ?? 0} messages sent successfully.${payload.failed ? ` (${payload.failed} failed)` : ""}`);
+      setFeedback(payload.message ?? `${payload.sent ?? 0} messages sent successfully.`);
       await loadContacts();
     } catch (messageError) {
       setError(messageError instanceof Error ? messageError.message : "Unable to send messages.");
@@ -344,8 +356,9 @@ export default function BDCenterPage() {
     setExcludedIds([]);
     setExcludeSearch("");
     setExcludeStatus("all");
+    setExcludeSentDelivered(true);
     setExcludeUnsubscribed(true);
-    setExcludeAlreadyContacted(false);
+    setExcludeAlreadyContacted(true);
     setExcludeWithoutEmail(true);
   }
 
@@ -625,7 +638,7 @@ export default function BDCenterPage() {
                     </span>
                   )}
                 </div>
-                {(excludedIds.length > 0 || excludeSearch || excludeStatus !== "all" || excludeAlreadyContacted) && (
+                {(excludedIds.length > 0 || excludeSearch || excludeStatus !== "all" || !excludeSentDelivered || !excludeUnsubscribed) && (
                   <button
                     type="button"
                     onClick={clearAllExclusions}
@@ -664,31 +677,43 @@ export default function BDCenterPage() {
                 </div>
 
                 <div className="flex flex-col justify-center space-y-1.5 pt-1 sm:col-span-2">
-                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer bg-white p-1.5 rounded border border-slate-200">
                     <input
                       type="checkbox"
-                      checked={excludeUnsubscribed}
-                      onChange={(e) => setExcludeUnsubscribed(e.target.checked)}
+                      checked={excludeSentDelivered}
+                      onChange={(e) => setExcludeSentDelivered(e.target.checked)}
                       className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
                     />
-                    <span><strong>Auto-exclude Unsubscribed contacts</strong> (compliance)</span>
+                    <span><strong>Exclude contacts with Sent or Delivered messages</strong> (no duplicates)</span>
                   </label>
 
-                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={excludeAlreadyContacted}
-                      onChange={(e) => setExcludeAlreadyContacted(e.target.checked)}
-                      className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
-                    />
-                    <span><strong>Exclude already contacted / qualified</strong> (fresh outreach only)</span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-3 pt-0.5">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={excludeUnsubscribed}
+                        onChange={(e) => setExcludeUnsubscribed(e.target.checked)}
+                        className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+                      />
+                      <span>Auto-exclude Unsubscribed</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={excludeAlreadyContacted}
+                        onChange={(e) => setExcludeAlreadyContacted(e.target.checked)}
+                        className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+                      />
+                      <span>Exclude pipeline leads (Contacted/Client)</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/60 pt-2 text-[11px] text-slate-600">
                 <span>
-                  <strong>Send Summary:</strong> {activeRecipients.length} will be emailed &bull; {excludedCount} excluded from this send batch.
+                  <strong>Send Summary:</strong> {activeRecipients.length} will receive email &bull; {excludedCount} excluded from this send batch.
                 </span>
                 {excludedIds.length > 0 && (
                   <span className="font-semibold text-rose-700">
@@ -750,7 +775,7 @@ export default function BDCenterPage() {
                     <th className="px-4 py-3">Organization</th>
                     <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Greeting</th>
-                    <th className="px-4 py-3">Organization type</th>
+                    <th className="px-4 py-3">Outreach / Delivery</th>
                     <th className="px-4 py-3">Corporate phone</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Email</th>
@@ -781,7 +806,25 @@ export default function BDCenterPage() {
                             <option value="NAME">By name</option>
                           </select>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{contact.organizationType ?? "Not classified"}</td>
+                        <td className="px-4 py-3">
+                          {contact.hasDeliveredMessage ? (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                              Delivered / Opened
+                            </span>
+                          ) : contact.hasSentMessage ? (
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                              Sent
+                            </span>
+                          ) : contact.lastMessageStatus === "FAILED" ? (
+                            <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                              Failed (Can Retry)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                              Unsent
+                            </span>
+                          )}
+                        </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{contact.corporatePhone ?? contact.phone ?? "No phone"}</td>
                         <td className="px-4 py-3">
                           <select value={contact.status} onChange={(event) => void updateContactStatus(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">

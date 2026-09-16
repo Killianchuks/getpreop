@@ -122,6 +122,7 @@ export async function POST(request: Request) {
     const subject = typeof body.subject === "string" ? body.subject.trim() : "GetPreOp Partnership";
     const messageBody = typeof body.body === "string" ? body.body : "";
     const channel = typeof body.channel === "string" ? body.channel : "EMAIL";
+    const excludeSentOrDelivered = body.excludeSentOrDelivered !== false;
 
     if (!contactIds.length || !messageBody.trim()) {
       return NextResponse.json({ error: "Select at least one contact and provide a message body." }, { status: 400 });
@@ -129,16 +130,43 @@ export async function POST(request: Request) {
 
     const contacts = await prisma.businessDevelopmentContact.findMany({
       where: { id: { in: contactIds } },
-      select: { id: true, email: true, contactName: true, jobTitle: true, salutation: true, organizationName: true },
+      select: {
+        id: true,
+        email: true,
+        contactName: true,
+        jobTitle: true,
+        salutation: true,
+        organizationName: true,
+        status: true,
+        messages: {
+          select: { status: true },
+        },
+      },
     });
 
     let sent = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (let i = 0; i < contacts.length; i++) {
       const contact = contacts[i];
       const email = contact.email?.trim().toLowerCase();
       if (!email) continue;
+
+      if (contact.status === "UNSUBSCRIBED") {
+        skipped++;
+        continue;
+      }
+
+      if (
+        excludeSentOrDelivered &&
+        contact.messages.some((m) =>
+          ["SENT", "DELIVERED", "OPENED", "CLICKED"].includes(m.status)
+        )
+      ) {
+        skipped++;
+        continue;
+      }
 
       const renderedContactName = formatContactName(contact);
       const renderedSubject = subject.replace(/\{\{contactName\}\}/g, renderedContactName);
@@ -212,7 +240,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       sent,
       failed,
-      message: `${sent} message${sent === 1 ? "" : "s"} processed successfully.${failed > 0 ? ` (${failed} failed, you can retry from BD Center)` : ""}`,
+      skipped,
+      message: `${sent} message${sent === 1 ? "" : "s"} processed successfully.${skipped > 0 ? ` (${skipped} excluded as already sent/delivered/unsubscribed)` : ""}${failed > 0 ? ` (${failed} failed, you can retry from BD Center)` : ""}`,
     });
   } catch (error) {
     console.error("BD messaging failed:", error);

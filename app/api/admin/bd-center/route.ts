@@ -76,33 +76,58 @@ export async function GET(request: Request) {
     const contacts = await prisma.businessDevelopmentContact.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { messages: true },
+      include: {
+        messages: {
+          select: {
+            id: true,
+            status: true,
+            sentAt: true,
+            deliveredAt: true,
+            openedAt: true,
+            createdAt: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({
-      contacts: contacts.map((contact) => ({
-        id: contact.id,
-        source: contact.source,
-        organizationName: contact.organizationName,
-        contactName: contact.contactName,
-        jobTitle: contact.jobTitle,
-        email: contact.email,
-        phone: contact.phone,
-        corporatePhone: contact.corporatePhone,
-        companyPhone: contact.companyPhone,
-        practiceAddress: contact.practiceAddress,
-        city: contact.city,
-        state: contact.state,
-        zipCode: contact.zipCode,
-        country: contact.country,
-        specialty: contact.specialty,
-        organizationType: contact.organizationType,
-        salutation: contact.salutation,
-        tags: contact.tags,
-        status: contact.status,
-        notes: contact.notes,
-        createdAt: contact.createdAt.toISOString(),
-      })),
+      contacts: contacts.map((contact) => {
+        const hasSentMessage = contact.messages.some((m) =>
+          ["SENT", "DELIVERED", "OPENED", "CLICKED"].includes(m.status)
+        );
+        const hasDeliveredMessage = contact.messages.some((m) =>
+          ["DELIVERED", "OPENED", "CLICKED"].includes(m.status)
+        );
+
+        return {
+          id: contact.id,
+          source: contact.source,
+          organizationName: contact.organizationName,
+          contactName: contact.contactName,
+          jobTitle: contact.jobTitle,
+          email: contact.email,
+          phone: contact.phone,
+          corporatePhone: contact.corporatePhone,
+          companyPhone: contact.companyPhone,
+          practiceAddress: contact.practiceAddress,
+          city: contact.city,
+          state: contact.state,
+          zipCode: contact.zipCode,
+          country: contact.country,
+          specialty: contact.specialty,
+          organizationType: contact.organizationType,
+          salutation: contact.salutation,
+          tags: contact.tags,
+          status: contact.status,
+          notes: contact.notes,
+          lastContactedAt: contact.lastContactedAt ? contact.lastContactedAt.toISOString() : null,
+          hasSentMessage,
+          hasDeliveredMessage,
+          messagesCount: contact.messages.length,
+          lastMessageStatus: contact.messages[0]?.status ?? null,
+          createdAt: contact.createdAt.toISOString(),
+        };
+      }),
     });
   } catch (error) {
     console.error("BD contact fetch failed:", error);
