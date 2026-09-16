@@ -276,17 +276,62 @@ model BusinessDevelopmentContact {
 }
 
 model BusinessDevelopmentMessage {
-  id          String                     @id @default(cuid())
-  contactId   String
-  contact     BusinessDevelopmentContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  subject     String
-  body        String
-  channel     String                     @default("EMAIL")
-  status      String                     @default("QUEUED")
-  sentAt      DateTime?
-  createdAt   DateTime                   @default(now())
+  id                String                      @id @default(cuid())
+  contactId         String
+  contact           BusinessDevelopmentContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  subject           String
+  body              String
+  channel           String                      @default("EMAIL")
+  status            String                      @default("QUEUED")
+  providerMessageId String?
+  emailLogId        String?
+  deliveredAt       DateTime?
+  openedAt          DateTime?
+  errorMessage      String?
+  sentAt            DateTime?
+  createdAt         DateTime                    @default(now())
 
   @@index([contactId, createdAt])
+  @@index([providerMessageId])
+}
+
+enum EmailDeliveryStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  SPAM_COMPLAINT
+  FAILED
+}
+
+model EmailLog {
+  id                String              @id @default(cuid())
+  recipientEmail    String
+  recipientName     String?
+  subject           String
+  category          String              // "VERIFICATION_CODE", "PATIENT_UPLOAD", "BD_OUTREACH", "TEST", "NOTIFICATION"
+  channel           String              @default("EMAIL")
+  provider          String              // "mailersend", "smtp", "mock"
+  providerMessageId String?
+  status            EmailDeliveryStatus @default(QUEUED)
+  bodyText          String?
+  bodyHtml          String?
+  metadata          Json?
+  errorMessage      String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  openedAt          DateTime?
+  clickedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([recipientEmail])
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+  @@index([providerMessageId])
 }
 
 model AuditLog {

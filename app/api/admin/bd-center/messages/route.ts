@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { buildBDOutreachEmailContent } from "@/lib/email-templates";
+import { sendDeliverableEmail } from "@/lib/email-service";
 
 // Matches physician indicators in a job title (e.g. "Dr.", "MD", "DO", "Physician") as whole words.
 const DOCTOR_TITLE_PATTERN = /\b(dr\.?|md|do|physician|surgeon|anesthesiologist|doctor)\b/i;
@@ -33,13 +35,9 @@ export async function POST(request: Request) {
     });
 
     let sent = 0;
-    const apiKey = process.env.MAILERSEND_API_KEY;
-    const fromEmail = process.env.MAILERSEND_FROM_EMAIL ?? "contact@getpreop.com";
-    const fromName = process.env.MAILERSEND_FROM_NAME ?? "GetPreOp";
-    const replyToEmail = process.env.MAILERSEND_REPLY_TO_EMAIL ?? fromEmail;
 
     for (const contact of contacts) {
-      const email = contact.email?.trim();
+      const email = contact.email?.trim().toLowerCase();
       if (!email) continue;
 
       const renderedContactName = formatContactName(contact);
@@ -54,46 +52,49 @@ export async function POST(request: Request) {
           subject: renderedSubject,
           body: renderedBody,
           channel,
-          status: apiKey ? "SENDING" : "QUEUED",
+          status: "SENDING",
         },
       });
 
-      let finalStatus = "QUEUED";
+      const { html, text } = buildBDOutreachEmailContent({
+        contactName: renderedContactName,
+        recipientEmail: email,
+        organizationName: contact.organizationName ?? "your practice",
+        subject: renderedSubject,
+        messageBody: renderedBody,
+      });
 
-      if (apiKey) {
-        const response = await fetch("https://api.mailersend.com/v1/email", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: { email: fromEmail, name: fromName },
-            to: [{ email }],
-            reply_to: { email: replyToEmail, name: fromName },
-            subject: renderedSubject,
-            text: renderedBody,
-            html: `<p>${renderedBody.replace(/\n/g, "<br />")}</p>`,
-          }),
-        });
+      const sendResult = await sendDeliverableEmail({
+        to: email,
+        toName: renderedContactName,
+        subject: renderedSubject,
+        html,
+        text,
+        category: "BD_OUTREACH",
+        metadata: {
+          contactId: contact.id,
+          bdMessageId: messageRecord.id,
+          organizationName: contact.organizationName,
+        },
+      });
 
-        if (response.ok) {
-          finalStatus = "SENT";
-          sent += 1;
-        }
-      } else {
-        finalStatus = "QUEUED";
+      const finalStatus = sendResult.success ? "SENT" : "FAILED";
+      if (sendResult.success) {
+        sent += 1;
       }
 
       await prisma.businessDevelopmentMessage.update({
         where: { id: messageRecord.id },
         data: {
           status: finalStatus,
-          sentAt: finalStatus === "SENT" ? new Date() : null,
+          providerMessageId: sendResult.providerMessageId,
+          emailLogId: sendResult.logId,
+          errorMessage: sendResult.error || null,
+          sentAt: sendResult.success ? new Date() : null,
         },
       });
 
-      if (finalStatus === "SENT") {
+      if (sendResult.success) {
         await prisma.businessDevelopmentContact.update({
           where: { id: contact.id },
           data: { status: "CONTACTED", lastContactedAt: new Date() },
@@ -101,9 +102,12 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ sent, message: apiKey ? "Messages sent successfully." : "Messages queued for delivery." });
+    return NextResponse.json({
+      sent,
+      message: `${sent} message${sent === 1 ? "" : "s"} processed successfully with inbox tracking.`,
+    });
   } catch (error) {
     console.error("BD messaging failed:", error);
-    return NextResponse.json({ error: "Unable to queue messages." }, { status: 500 });
+    return NextResponse.json({ error: "Unable to process messages." }, { status: 500 });
   }
 }

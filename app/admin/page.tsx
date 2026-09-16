@@ -14,6 +14,7 @@ import {
   FileText,
   FolderOpen,
   LayoutDashboard,
+  Mail,
   ReceiptText,
   Settings,
   Stethoscope,
@@ -68,6 +69,7 @@ const navigation = [
   {
     label: "Platform",
     items: [
+      { id: "emails", href: "/admin/emails", label: "Email tracking", icon: Mail, count: "Inbox" },
       { id: "verification", href: "/admin/verification", label: "Verification", icon: BadgeCheck },
       { id: "availability", href: "/admin/availability", label: "Clinician availability", icon: CalendarDays },
       { id: "reports", href: "/admin/reports", label: "Reports", icon: FileBarChart },

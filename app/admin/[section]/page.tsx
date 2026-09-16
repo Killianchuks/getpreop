@@ -15,6 +15,7 @@ const sections: Record<string, { title: string; description: string; status: str
   availability: { title: "Clinician availability", description: "Review clinician capacity before assigning new cases.", status: "3 clinicians available", action: "View availability" },
   reports: { title: "Reports", description: "Monitor readiness reports, turnaround time, and delivery completion.", status: "96% delivered within target", action: "View reports" },
   activity: { title: "Activity log", description: "Review recent administrative and clinical workflow events.", status: "Current system activity", action: "View activity" },
+  emails: { title: "Email tracking", description: "Review email deliverability, DNS health, and sent message logs.", status: "Real-time delivery tracking active", action: "Open email tracking" },
   settings: { title: "General settings", description: "Configure GetPreOp operational defaults and alerts.", status: "Platform configuration", action: "Open settings" },
   notifications: { title: "Notifications", description: "Configure alerts for referrals, delayed reports, and verification changes.", status: "Notifications are enabled", action: "Manage notifications" },
   install: { title: "Add to home screen", description: "Install GetPreOp for faster access from this device.", status: "Available on supported browsers", action: "Install app" },

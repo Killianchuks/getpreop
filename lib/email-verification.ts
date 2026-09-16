@@ -1,4 +1,6 @@
 import { createHash, randomInt } from "node:crypto";
+import { buildVerificationEmailContent } from "@/lib/email-templates";
+import { sendDeliverableEmail } from "@/lib/email-service";
 
 export function createVerificationCode() {
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
@@ -10,30 +12,33 @@ export function hashVerificationCode(code: string) {
 }
 
 export async function sendVerificationEmail(email: string, code: string) {
-  const apiKey = process.env.MAILERSEND_API_KEY;
-  const fromEmail = process.env.MAILERSEND_FROM_EMAIL ?? "contact@getpreop.com";
-  const fromName = process.env.MAILERSEND_FROM_NAME ?? "GetPreOp";
+  const normalizedEmail = email.trim().toLowerCase();
+  const { html, text } = buildVerificationEmailContent(code, normalizedEmail);
 
-  if (!apiKey) {
-    if (process.env.NODE_ENV !== "production") return { sent: false, developmentCode: code };
-    throw new Error("MAILERSEND_API_KEY is not configured");
-  }
-
-  const response = await fetch("https://api.mailersend.com/v1/email", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: { email: fromEmail, name: fromName },
-      to: [{ email }],
-      subject: "Verify your GetPreOp account",
-      text: `Your GetPreOp verification code is ${code}. It expires in 15 minutes.`,
-      html: `<p>Your GetPreOp verification code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 15 minutes.</p>`,
-    }),
+  const result = await sendDeliverableEmail({
+    to: normalizedEmail,
+    subject: "Verify your GetPreOp account",
+    html,
+    text,
+    category: "VERIFICATION_CODE",
+    metadata: {
+      type: "SECURITY_VERIFICATION",
+    },
   });
 
-  if (!response.ok) {
-    throw new Error(`MailerSend verification email failed with status ${response.status}`);
+  if (!result.success && process.env.NODE_ENV !== "production") {
+    return { sent: false, developmentCode: code, logId: result.logId };
   }
 
-  return { sent: true };
+  if (!result.success) {
+    throw new Error(result.error || "Failed to deliver verification email");
+  }
+
+  return {
+    sent: true,
+    logId: result.logId,
+    messageId: result.providerMessageId,
+    provider: result.provider,
+    ...(result.provider === "mock" ? { developmentCode: code } : {}),
+  };
 }
