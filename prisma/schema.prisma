@@ -344,6 +344,23 @@ model AuditLog {
   createdAt  DateTime @default(now())
 }
 
+model DemoAvailabilitySlot {
+  id          String   @id @default(cuid())
+  date        String   // "YYYY-MM-DD"
+  time        String   // "9:00 AM", "10:00 AM", etc.
+  durationMin Int      @default(15)
+  isBooked    Boolean  @default(false)
+  bookedByName String?
+  bookedByEmail String?
+  bookedByOrg String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([date, time])
+  @@index([date, isBooked])
+}
+
 model QuestionnaireResponse {
   id               String         @id @default(cuid())
   patientProfileId String

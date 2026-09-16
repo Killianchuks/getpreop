@@ -264,9 +264,26 @@ export function buildBDOutreachEmailContent(input: {
     ? `${APP_URL}/api/email/track-click?id=${input.logId}&url=${encodeURIComponent(APP_URL)}`
     : APP_URL;
 
+  const demoUrl = input.logId
+    ? `${APP_URL}/api/email/track-click?id=${input.logId}&url=${encodeURIComponent(`${APP_URL}/book-demo`)}`
+    : `${APP_URL}/book-demo`;
+
+  // Format paragraphs and convert URLs/CTAs into clickable styled buttons and links
   const formattedHtmlBody = input.messageBody
     .split("\n\n")
-    .map((paragraph) => `<p style="margin:0 0 16px 0;">${paragraph.replace(/\n/g, "<br />")}</p>`)
+    .map((paragraph) => {
+      let text = paragraph.replace(/\n/g, "<br />");
+      // Replace raw book-demo link with styled button
+      if (text.includes("/book-demo")) {
+        return `
+          <p style="margin:0 0 16px 0;">${text.replace(/https?:\/\/[^\s<]+/g, `<a href="${demoUrl}" style="color:#0f766e;text-decoration:underline;">${demoUrl}</a>`)}</p>
+          <div style="margin:20px 0 24px 0;">
+            <a href="${demoUrl}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;font-size:14px;letter-spacing:0.02em;">Book a 15-Minute Demo Walkthrough &rarr;</a>
+          </div>
+        `;
+      }
+      return `<p style="margin:0 0 16px 0;">${text}</p>`;
+    })
     .join("");
 
   const contentHtml = `
@@ -274,8 +291,8 @@ export function buildBDOutreachEmailContent(input: {
       ${formattedHtmlBody}
     </div>
     <div style="margin:24px 0 0 0;padding-top:16px;border-top:1px solid #e2e8f0;">
-      <p style="margin:0;font-weight:600;color:#0f172a;">GetPreOp Partnerships Team</p>
-      <p style="margin:2px 0 0 0;font-size:13px;color:#64748b;">Virtual Anesthesiology Preoperative Care &bull; <a href="${siteUrl}" style="color:#0f766e;text-decoration:underline;">getpreop.com</a></p>
+      <p style="margin:0;font-weight:600;color:#0f172a;">Dr. Jessica Onwudiwe, MD</p>
+      <p style="margin:2px 0 0 0;font-size:13px;color:#64748b;">Founder & CEO, GetPreOp &bull; <a href="${siteUrl}" style="color:#0f766e;text-decoration:underline;">getpreop.com</a></p>
     </div>
   `;
 

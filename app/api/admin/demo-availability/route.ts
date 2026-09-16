@@ -1,0 +1,239 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { sendDeliverableEmail } from "@/lib/email-service";
+import { buildDeliverableEmailLayout } from "@/lib/email-templates";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get("date");
+    const futureOnly = searchParams.get("futureOnly") !== "false";
+
+    const where: { date?: string; isBooked?: boolean } = {};
+    if (date) {
+      where.date = date;
+    }
+
+    const slots = await prisma.demoAvailabilitySlot.findMany({
+      where,
+      orderBy: [{ date: "asc" }, { time: "asc" }],
+    });
+
+    return NextResponse.json({ slots });
+  } catch (error) {
+    console.error("Failed to load demo availability slots:", error);
+    return NextResponse.json({ error: "Unable to load demo availability" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const action = body.action || "save_slots";
+
+    // 1. Admin save / update slots
+    if (action === "save_slots") {
+      const slots = Array.isArray(body.slots) ? body.slots : [];
+      // slots: Array<{ date: string, time: string, isBooked?: boolean }>
+
+      const date = typeof body.date === "string" ? body.date : null;
+
+      if (date) {
+        // Replace unbooked slots for a specific date
+        await prisma.demoAvailabilitySlot.deleteMany({
+          where: { date, isBooked: false },
+        });
+
+        if (slots.length > 0) {
+          for (const slot of slots) {
+            await prisma.demoAvailabilitySlot.upsert({
+              where: { date_time: { date: slot.date, time: slot.time } },
+              update: {},
+              create: {
+                date: slot.date,
+                time: slot.time,
+                durationMin: slot.durationMin || 15,
+                isBooked: false,
+              },
+            });
+          }
+        }
+      } else {
+        // Upsert all provided slots
+        for (const slot of slots) {
+          if (slot.date && slot.time) {
+            await prisma.demoAvailabilitySlot.upsert({
+              where: { date_time: { date: slot.date, time: slot.time } },
+              update: {},
+              create: {
+                date: slot.date,
+                time: slot.time,
+                durationMin: slot.durationMin || 15,
+                isBooked: false,
+              },
+            });
+          }
+        }
+      }
+
+      return NextResponse.json({ success: true, message: "Availability slots saved." });
+    }
+
+    // 2. Admin recurring slots generator
+    if (action === "apply_recurring") {
+      const { startDate, endDate, days, times } = body;
+      if (!startDate || !endDate || !Array.isArray(days) || !Array.isArray(times)) {
+        return NextResponse.json({ error: "Missing recurring schedule parameters." }, { status: 400 });
+      }
+
+      const weekdayMap: Record<string, number> = {
+        Sun: 0,
+        Mon: 1,
+        Tue: 2,
+        Wed: 3,
+        Thu: 4,
+        Fri: 5,
+        Sat: 6,
+      };
+
+      const targetDayIndices = new Set(days.map((d: string) => weekdayMap[d]).filter((d) => d !== undefined));
+      const start = new Date(`${startDate}T12:00:00`);
+      const end = new Date(`${endDate}T12:00:00`);
+      let created = 0;
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dayIdx = d.getDay();
+        if (targetDayIndices.has(dayIdx)) {
+          const dateKey = d.toISOString().slice(0, 10);
+          for (const time of times) {
+            await prisma.demoAvailabilitySlot.upsert({
+              where: { date_time: { date: dateKey, time } },
+              update: {},
+              create: {
+                date: dateKey,
+                time,
+                durationMin: 15,
+                isBooked: false,
+              },
+            });
+            created++;
+          }
+        }
+      }
+
+      return NextResponse.json({ success: true, count: created, message: `Created recurring slots.` });
+    }
+
+    // 3. User / Partner Book a Slot
+    if (action === "book_slot") {
+      const { slotId, name, email, organization, notes } = body;
+      if (!slotId || !name || !email) {
+        return NextResponse.json({ error: "Please provide your name and email to confirm the booking." }, { status: 400 });
+      }
+
+      const slot = await prisma.demoAvailabilitySlot.findUnique({ where: { id: slotId } });
+      if (!slot || slot.isBooked) {
+        return NextResponse.json({ error: "This time slot is no longer available. Please choose another time." }, { status: 409 });
+      }
+
+      const updatedSlot = await prisma.demoAvailabilitySlot.update({
+        where: { id: slotId },
+        data: {
+          isBooked: true,
+          bookedByName: name.trim(),
+          bookedByEmail: email.trim().toLowerCase(),
+          bookedByOrg: organization ? organization.trim() : null,
+          notes: notes ? notes.trim() : null,
+        },
+      });
+
+      // Send confirmation emails to the lead and admin
+      try {
+        const formattedDate = new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }).format(new Date(`${slot.date}T12:00:00`));
+
+        const confirmationLayout = buildDeliverableEmailLayout({
+          title: "Your GetPreOp Platform Demo is Confirmed",
+          preheader: `Demo scheduled with Dr. Jessica Onwudiwe for ${formattedDate} at ${slot.time}.`,
+          contentHtml: `
+            <h2 style="font-size:18px;font-weight:700;color:#0f172a;margin-top:0;margin-bottom:12px;">Demo Confirmed</h2>
+            <p style="margin:0 0 16px 0;">Hello <strong>${name}</strong>,</p>
+            <p style="margin:0 0 16px 0;">Your 15-minute 1-on-1 walkthrough and demonstration of GetPreOp has been confirmed with <strong>Dr. Jessica Onwudiwe, MD</strong>.</p>
+            
+            <div style="background-color:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:16px;margin:16px 0;">
+              <table role="presentation" border="0" cellpadding="4" cellspacing="0" width="100%" style="font-size:14px;">
+                <tr>
+                  <td style="width:120px;color:#0f766e;font-weight:600;">Date:</td>
+                  <td style="color:#0f172a;font-weight:700;">${formattedDate}</td>
+                </tr>
+                <tr>
+                  <td style="color:#0f766e;font-weight:600;">Time:</td>
+                  <td style="color:#0f172a;font-weight:700;">${slot.time} (US Central Time / CT)</td>
+                </tr>
+                <tr>
+                  <td style="color:#0f766e;font-weight:600;">Host:</td>
+                  <td style="color:#0f172a;">Dr. Jessica Onwudiwe, MD (Founder & CEO)</td>
+                </tr>
+                ${organization ? `<tr><td style="color:#0f766e;font-weight:600;">Organization:</td><td style="color:#0f172a;">${organization}</td></tr>` : ""}
+              </table>
+            </div>
+
+            <p style="margin:16px 0 0 0;">We look forward to connecting and discussing how GetPreOp reduces day-of-surgery cancellations and enhances pre-op readiness for your team.</p>
+          `,
+          contentText: `Hello ${name},\n\nYour 15-minute GetPreOp demo is confirmed for ${formattedDate} at ${slot.time} (CT) with Dr. Jessica Onwudiwe, MD.`,
+          recipientEmail: email,
+          showUnsubscribe: false,
+          categoryNote: "This confirmation was generated from your GetPreOp demo request.",
+        });
+
+        await sendDeliverableEmail({
+          to: email,
+          toName: name,
+          subject: `Confirmed: GetPreOp Demo on ${formattedDate} at ${slot.time}`,
+          html: confirmationLayout.html,
+          text: confirmationLayout.text,
+          category: "NOTIFICATION",
+          metadata: { demoBookingId: slot.id, slotDate: slot.date, slotTime: slot.time },
+        });
+      } catch (emailErr) {
+        console.error("Failed to dispatch demo confirmation email:", emailErr);
+      }
+
+      return NextResponse.json({ success: true, slot: updatedSlot, message: "Demo scheduled successfully!" });
+    }
+
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  } catch (error) {
+    console.error("Error processing demo availability:", error);
+    return NextResponse.json({ error: "Unable to process request" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const id = typeof body.id === "string" ? body.id : null;
+    const date = typeof body.date === "string" ? body.date : null;
+
+    if (id) {
+      await prisma.demoAvailabilitySlot.delete({ where: { id } });
+      return NextResponse.json({ success: true, message: "Slot deleted." });
+    }
+
+    if (date) {
+      await prisma.demoAvailabilitySlot.deleteMany({ where: { date } });
+      return NextResponse.json({ success: true, message: `All slots for ${date} deleted.` });
+    }
+
+    return NextResponse.json({ error: "Specify slot ID or date" }, { status: 400 });
+  } catch (error) {
+    console.error("Failed to delete demo slot:", error);
+    return NextResponse.json({ error: "Delete failed" }, { status: 500 });
+  }
+}

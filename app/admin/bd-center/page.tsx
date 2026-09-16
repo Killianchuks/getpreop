@@ -35,7 +35,7 @@ interface ContactRecord {
 
 const defaultMessage = {
   subject: "Introduction to GetPreOp partnership",
-  body: "Hello {{contactName}},\n\nWe are reaching out to connect on improving surgical readiness and pre-op coordination for {{organizationName}}.\n\nGetPreOp helps practices and facilities reduce day-of-surgery delays and improve patient readiness workflows.\n\nWould you be open to a brief conversation about how we can support your team?\n\nBest,\nGetPreOp Team",
+  body: "Hello {{contactName}},\n\nMy name is Dr. Jessica Onwudiwe, a licensed anesthesiologist trained at the University of Chicago and the founder of GetPreOp.\n\nI help surgical centers improve pre-operative readiness and coordination, reducing same-day surgery cancellations, avoidable delays, and incomplete workups. I came across {{organizationName}} and thought this might be relevant to your team.\n\nWould you be open to a brief 10-15-minute conversation to see if there is an opportunity to support your pre-op workflow?\n\nYou can view my availability and book a 15-minute demo directly here:\nhttps://www.getpreop.com/book-demo\n\nBest,\nDr Jessica Onwudiwe, MD\nFounder, GetPreOp",
 };
 
 // Matches physician indicators in a job title (e.g. "Dr.", "MD", "DO", "Physician") as whole words.
