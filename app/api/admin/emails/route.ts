@@ -178,3 +178,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Action processing failed." }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const id = typeof body.id === "string" ? body.id : null;
+    const ids = Array.isArray(body.ids) ? body.ids.filter((val: unknown) => typeof val === "string") : [];
+    const deleteFailedOnly = Boolean(body.deleteFailedOnly);
+
+    if (id) {
+      await prisma.emailLog.delete({ where: { id } });
+      await prisma.businessDevelopmentMessage.deleteMany({ where: { emailLogId: id } });
+      return NextResponse.json({ success: true, message: "Email log deleted." });
+    }
+
+    if (ids.length > 0) {
+      await prisma.emailLog.deleteMany({ where: { id: { in: ids } } });
+      await prisma.businessDevelopmentMessage.deleteMany({ where: { emailLogId: { in: ids } } });
+      return NextResponse.json({ success: true, deleted: ids.length, message: `${ids.length} email logs deleted.` });
+    }
+
+    if (deleteFailedOnly) {
+      const res = await prisma.emailLog.deleteMany({ where: { status: "FAILED" } });
+      await prisma.businessDevelopmentMessage.deleteMany({ where: { status: "FAILED" } });
+      return NextResponse.json({ success: true, deleted: res.count, message: `${res.count} failed email logs cleared.` });
+    }
+
+    return NextResponse.json({ error: "Provide a log ID or IDs to delete." }, { status: 400 });
+  } catch (error) {
+    console.error("Delete email log error:", error);
+    return NextResponse.json({ error: "Failed to delete email log." }, { status: 500 });
+  }
+}

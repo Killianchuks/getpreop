@@ -62,6 +62,8 @@ export default function BDCenterPage() {
   const [error, setError] = useState<string | null>(null);
   const [manualContact, setManualContact] = useState({ contactName: "", organizationName: "", organizationType: "", email: "", corporatePhone: "", companyPhone: "", practiceAddress: "", notes: "" });
   const [savingManualContact, setSavingManualContact] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [clearingFailed, setClearingFailed] = useState(false);
 
   const stateOptions = useMemo(() => {
     const states = new Set<string>();
@@ -188,6 +190,52 @@ export default function BDCenterPage() {
       setError(manualError instanceof Error ? manualError.message : "Unable to add contact.");
     } finally {
       setSavingManualContact(false);
+    }
+  }
+
+  async function retryFailedMessages() {
+    setRetrying(true);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/admin/bd-center/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retry_failed", limit: 50 }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Failed to retry messages.");
+      setFeedback(payload.message ?? "Retried failed messages.");
+      await loadContacts();
+    } catch (retryErr) {
+      setError(retryErr instanceof Error ? retryErr.message : "Error retrying messages.");
+    } finally {
+      setRetrying(false);
+    }
+  }
+
+  async function clearFailedMessages() {
+    if (!window.confirm("Delete all failed message records? This cleans up the queue and error logs.")) return;
+
+    setClearingFailed(true);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/admin/bd-center/messages", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteFailedOnly: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Failed to clear failed messages.");
+      setFeedback(payload.message ?? "Cleared failed messages.");
+      await loadContacts();
+    } catch (clearErr) {
+      setError(clearErr instanceof Error ? clearErr.message : "Error clearing failed messages.");
+    } finally {
+      setClearingFailed(false);
     }
   }
 
@@ -460,11 +508,32 @@ export default function BDCenterPage() {
           </div>
 
           <form onSubmit={handleSendMessage} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-slate-900">Bulk outreach</h2>
-              <button type="submit" className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-900">
-                Send to {selectedIds.length ? selectedIds.length : filteredContacts.length} contacts
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Bulk outreach</h2>
+                <p className="text-xs text-slate-500">Paced automated delivery with anti-spam & open tracking</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={retryFailedMessages}
+                  disabled={retrying}
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 transition"
+                >
+                  {retrying ? "Retrying failed..." : "Retry failed batch (50)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearFailedMessages}
+                  disabled={clearingFailed}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+                >
+                  {clearingFailed ? "Clearing..." : "Clear failed messages"}
+                </button>
+                <button type="submit" className="rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-900">
+                  Send to {selectedIds.length ? selectedIds.length : filteredContacts.length} contacts
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">

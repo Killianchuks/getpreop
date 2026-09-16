@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 
 interface EmailLogItem {
@@ -86,6 +87,8 @@ export default function EmailTrackingPage() {
 
   // Copied DNS record state
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [clearingFailed, setClearingFailed] = useState(false);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
 
   const fetchEmailData = useCallback(async () => {
     setLoading(true);
@@ -157,6 +160,49 @@ export default function EmailTrackingPage() {
       fetchEmailData();
     } catch {
       alert("Error resending message.");
+    }
+  }
+
+  async function handleDeleteLog(logId: string) {
+    if (!window.confirm("Are you sure you want to delete this email log?")) return;
+
+    setDeletingLogId(logId);
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: logId }),
+      });
+      if (res.ok) {
+        if (selectedLog?.id === logId) setSelectedLog(null);
+        fetchEmailData();
+      } else {
+        alert("Failed to delete email log.");
+      }
+    } catch {
+      alert("Error deleting email log.");
+    } finally {
+      setDeletingLogId(null);
+    }
+  }
+
+  async function handleClearFailedLogs() {
+    if (!window.confirm("Are you sure you want to delete all failed email records?")) return;
+
+    setClearingFailed(true);
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteFailedOnly: true }),
+      });
+      const data = await res.json();
+      alert(data.message || "Failed logs cleared.");
+      fetchEmailData();
+    } catch {
+      alert("Error clearing failed logs.");
+    } finally {
+      setClearingFailed(false);
     }
   }
 
@@ -238,6 +284,14 @@ export default function EmailTrackingPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleClearFailedLogs}
+            disabled={clearingFailed || (stats?.failed ?? 0) === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {clearingFailed ? "Clearing..." : `Clear Failed Logs (${stats?.failed ?? 0})`}
+          </button>
           <button
             onClick={() => fetchEmailData()}
             disabled={loading}
@@ -479,14 +533,25 @@ export default function EmailTrackingPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLog(log)}
-                        className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        <Eye className="h-3 w-3" />
-                        Inspect
-                      </button>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLog(log)}
+                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Inspect
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingLogId === log.id}
+                          onClick={() => handleDeleteLog(log.id)}
+                          className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-red-600 transition"
+                          title="Delete email record"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -648,14 +713,24 @@ export default function EmailTrackingPage() {
 
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3">
-              <button
-                type="button"
-                onClick={() => handleResend(selectedLog.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              >
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                Resend Message
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleResend(selectedLog.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  Resend Message
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteLog(selectedLog.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete Record
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedLog(null)}

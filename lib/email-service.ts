@@ -58,8 +58,10 @@ function buildDeliverabilityHeaders(recipientEmail: string, logId: string) {
   };
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Sends an email with deliverability optimizations, anti-spam headers, and persistent tracking in EmailLog.
+ * Sends an email with deliverability optimizations, anti-spam headers, rate-limit retry backoff, and persistent tracking in EmailLog.
  */
 export async function sendDeliverableEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   const to = options.to.trim().toLowerCase();
@@ -112,95 +114,105 @@ export async function sendDeliverableEmail(options: SendEmailOptions): Promise<S
 
   const deliverabilityHeaders = buildDeliverabilityHeaders(to, logId);
 
-  // 2. Primary Provider: MailerSend REST API
+  // 2. Primary Provider: MailerSend REST API with rate-limit retry & backoff
   if (apiKey) {
-    try {
-      const response = await fetch("https://api.mailersend.com/v1/email", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify({
-          from: {
-            email: fromEmail,
-            name: fromName,
-          },
-          to: [
-            {
-              email: to,
-              name: options.toName || to,
-            },
-          ],
-          reply_to: {
-            email: replyTo,
-            name: fromName,
-          },
-          subject: options.subject,
-          text: options.text,
-          html: processedHtml,
-          tags: [options.category.toLowerCase().replace(/_/g, "-")],
-        }),
-      });
+    const maxRetries = 3;
+    let attempt = 0;
+    let success = false;
 
-      const responseText = await response.text();
-      let responseJson: Record<string, unknown> = {};
+    while (attempt < maxRetries && !success) {
+      attempt++;
       try {
-        if (responseText) responseJson = JSON.parse(responseText);
-      } catch {
-        // non-json response body
-      }
-
-      const headerMessageId = response.headers.get("x-message-id");
-      const providerMessageId = headerMessageId || (typeof responseJson.message_id === "string" ? responseJson.message_id : `ms_${Date.now()}`);
-
-      if (response.ok || response.status === 202) {
-        if (logId && !logId.startsWith("fallback_")) {
-          await prisma.emailLog.update({
-            where: { id: logId },
-            data: {
-              status: "SENT",
-              providerMessageId,
-              sentAt: new Date(),
-              errorMessage: null,
+        const response = await fetch("https://api.mailersend.com/v1/email", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          body: JSON.stringify({
+            from: {
+              email: fromEmail,
+              name: fromName,
             },
-          });
+            to: [
+              {
+                email: to,
+                name: options.toName || to,
+              },
+            ],
+            reply_to: {
+              email: replyTo,
+              name: fromName,
+            },
+            subject: options.subject,
+            text: options.text,
+            html: processedHtml,
+            tags: [options.category.toLowerCase().replace(/_/g, "-")],
+          }),
+        });
+
+        const responseText = await response.text();
+        let responseJson: Record<string, unknown> = {};
+        try {
+          if (responseText) responseJson = JSON.parse(responseText);
+        } catch {
+          // non-json response body
         }
-        return {
-          success: true,
-          logId,
-          provider: "mailersend",
-          providerMessageId,
-          status: "SENT",
-        };
-      }
 
-      // If MailerSend returned an error status:
-      lastError = `MailerSend API failed (${response.status}): ${responseText || response.statusText}`;
-      console.warn(lastError, "Falling back to SMTP if available.");
+        const headerMessageId = response.headers.get("x-message-id");
+        const providerMessageId = headerMessageId || (typeof responseJson.message_id === "string" ? responseJson.message_id : `ms_${Date.now()}`);
 
-      if (logId && !logId.startsWith("fallback_")) {
-        await prisma.emailLog.update({
-          where: { id: logId },
-          data: {
-            status: "FAILED",
-            errorMessage: lastError,
-          },
-        });
+        if (response.ok || response.status === 202) {
+          success = true;
+          if (logId && !logId.startsWith("fallback_")) {
+            await prisma.emailLog.update({
+              where: { id: logId },
+              data: {
+                status: "SENT",
+                providerMessageId,
+                sentAt: new Date(),
+                errorMessage: null,
+              },
+            });
+          }
+          return {
+            success: true,
+            logId,
+            provider: "mailersend",
+            providerMessageId,
+            status: "SENT",
+          };
+        }
+
+        // If rate-limited (HTTP 429), back off and retry
+        if (response.status === 429) {
+          const retryAfterHeader = response.headers.get("retry-after");
+          const waitTime = retryAfterHeader ? Number(retryAfterHeader) * 1000 : attempt * 1200;
+          console.warn(`MailerSend rate-limited (429). Backing off for ${waitTime}ms before retry ${attempt}/${maxRetries}...`);
+          await sleep(waitTime);
+          continue;
+        }
+
+        // Other HTTP error
+        lastError = `MailerSend API error (${response.status}): ${responseText || response.statusText}`;
+        console.warn(lastError, "Falling back if available.");
+        break;
+      } catch (apiError: unknown) {
+        lastError = apiError instanceof Error ? apiError.message : "MailerSend network request error";
+        console.error("MailerSend request exception:", apiError);
+        await sleep(attempt * 1000);
       }
-    } catch (apiError: unknown) {
-      lastError = apiError instanceof Error ? apiError.message : "MailerSend network request error";
-      console.error("MailerSend request exception:", apiError);
-      if (logId && !logId.startsWith("fallback_")) {
-        await prisma.emailLog.update({
-          where: { id: logId },
-          data: {
-            status: "FAILED",
-            errorMessage: lastError,
-          },
-        });
-      }
+    }
+
+    if (!success && logId && !logId.startsWith("fallback_")) {
+      await prisma.emailLog.update({
+        where: { id: logId },
+        data: {
+          status: "FAILED",
+          errorMessage: lastError,
+        },
+      });
     }
   }
 

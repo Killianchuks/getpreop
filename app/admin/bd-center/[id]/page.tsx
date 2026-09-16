@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import BDContactEditor from "@/components/bd-contact-editor";
+import BDMessageList from "@/components/bd-message-list";
 
 export default async function BDContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -55,50 +56,7 @@ export default async function BDContactDetailPage({ params }: { params: Promise<
               View all logs &rarr;
             </Link>
           </div>
-          {contact.messages.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">No outreach has been sent yet.</p>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {contact.messages.map((message) => {
-                const statusColor =
-                  message.status === "DELIVERED" || message.status === "OPENED"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : message.status === "SENT"
-                    ? "bg-blue-50 text-blue-700"
-                    : message.status === "BOUNCED" || message.status === "FAILED"
-                    ? "bg-rose-50 text-rose-700"
-                    : "bg-slate-100 text-slate-600";
-
-                return (
-                  <li key={message.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-800">{message.subject}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}>
-                        {message.status}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                      <span>Sent: {new Date(message.createdAt).toLocaleString()}</span>
-                      {message.deliveredAt && (
-                        <span className="font-semibold text-emerald-700">
-                          &bull; Delivered: {new Date(message.deliveredAt).toLocaleTimeString()}
-                        </span>
-                      )}
-                      {message.openedAt && (
-                        <span className="font-semibold text-teal-800">
-                          &bull; Opened: {new Date(message.openedAt).toLocaleTimeString()}
-                        </span>
-                      )}
-                    </div>
-                    {message.errorMessage && (
-                      <p className="mt-1.5 text-[11px] font-medium text-rose-600">Error: {message.errorMessage}</p>
-                    )}
-                    <p className="mt-2 text-xs leading-5 text-slate-700">{message.body}</p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <BDMessageList messages={contact.messages} />
         </aside>
       </div>
     </main>
