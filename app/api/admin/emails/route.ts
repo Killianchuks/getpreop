@@ -185,26 +185,79 @@ export async function DELETE(request: Request) {
     const id = typeof body.id === "string" ? body.id : null;
     const ids = Array.isArray(body.ids) ? body.ids.filter((val: unknown) => typeof val === "string") : [];
     const deleteFailedOnly = Boolean(body.deleteFailedOnly);
+    const deleteFiltered = Boolean(body.deleteFiltered);
 
     if (id) {
-      await prisma.emailLog.delete({ where: { id } });
-      await prisma.businessDevelopmentMessage.deleteMany({ where: { emailLogId: id } });
+      await prisma.emailLog.delete({ where: { id } }).catch(() => {});
+      await prisma.businessDevelopmentMessage.deleteMany({ where: { emailLogId: id } }).catch(() => {});
       return NextResponse.json({ success: true, message: "Email log deleted." });
     }
 
     if (ids.length > 0) {
-      await prisma.emailLog.deleteMany({ where: { id: { in: ids } } });
-      await prisma.businessDevelopmentMessage.deleteMany({ where: { emailLogId: { in: ids } } });
-      return NextResponse.json({ success: true, deleted: ids.length, message: `${ids.length} email logs deleted.` });
+      const deletedLogs = await prisma.emailLog.deleteMany({ where: { id: { in: ids } } });
+      await prisma.businessDevelopmentMessage.deleteMany({ where: { emailLogId: { in: ids } } }).catch(() => {});
+      return NextResponse.json({ success: true, deleted: deletedLogs.count, message: `${deletedLogs.count} email logs deleted.` });
+    }
+
+    if (deleteFiltered) {
+      const search = typeof body.search === "string" ? body.search.trim() : "";
+      const status = typeof body.status === "string" ? body.status : "all";
+      const category = typeof body.category === "string" ? body.category : "all";
+
+      const where: Prisma.EmailLogWhereInput = {};
+
+      if (search) {
+        where.OR = [
+          { recipientEmail: { contains: search, mode: "insensitive" } },
+          { recipientName: { contains: search, mode: "insensitive" } },
+          { subject: { contains: search, mode: "insensitive" } },
+          { providerMessageId: { contains: search, mode: "insensitive" } },
+        ];
+      }
+
+      if (status !== "all") {
+        if (status === "UNREAD") {
+          where.status = { notIn: ["OPENED", "CLICKED"] };
+        } else if (status === "READ") {
+          where.status = { in: ["OPENED", "CLICKED"] };
+        } else if (status === "DELIVERED") {
+          where.status = { in: ["DELIVERED", "OPENED", "CLICKED"] };
+        } else {
+          where.status = status as Prisma.EnumEmailDeliveryStatusFilter["equals"];
+        }
+      }
+
+      if (category !== "all") {
+        where.category = category;
+      }
+
+      const matchingLogs = await prisma.emailLog.findMany({
+        where,
+        select: { id: true },
+      });
+      const matchingIds = matchingLogs.map((l) => l.id);
+
+      const res = await prisma.emailLog.deleteMany({ where });
+      if (matchingIds.length > 0) {
+        await prisma.businessDevelopmentMessage.deleteMany({
+          where: { emailLogId: { in: matchingIds } },
+        }).catch(() => {});
+      }
+
+      return NextResponse.json({
+        success: true,
+        deleted: res.count,
+        message: `${res.count} filtered email logs deleted.`,
+      });
     }
 
     if (deleteFailedOnly) {
       const res = await prisma.emailLog.deleteMany({ where: { status: "FAILED" } });
-      await prisma.businessDevelopmentMessage.deleteMany({ where: { status: "FAILED" } });
+      await prisma.businessDevelopmentMessage.deleteMany({ where: { status: "FAILED" } }).catch(() => {});
       return NextResponse.json({ success: true, deleted: res.count, message: `${res.count} failed email logs cleared.` });
     }
 
-    return NextResponse.json({ error: "Provide a log ID or IDs to delete." }, { status: 400 });
+    return NextResponse.json({ error: "Provide a log ID, array of IDs, or filter parameters to delete." }, { status: 400 });
   } catch (error) {
     console.error("Delete email log error:", error);
     return NextResponse.json({ error: "Failed to delete email log." }, { status: 500 });

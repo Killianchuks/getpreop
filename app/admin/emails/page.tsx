@@ -73,10 +73,12 @@ export default function EmailTrackingPage() {
   const [logs, setLogs] = useState<EmailLogItem[]>([]);
   const [stats, setStats] = useState<EmailStats | null>(null);
   const [dnsConfig, setDnsConfig] = useState<DnsConfig | null>(null);
+  const [totalFiltered, setTotalFiltered] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedLog, setSelectedLog] = useState<EmailLogItem | null>(null);
   const [previewTab, setPreviewTab] = useState<"preview" | "text" | "details">("preview");
 
@@ -89,6 +91,8 @@ export default function EmailTrackingPage() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [clearingFailed, setClearingFailed] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [deletingFiltered, setDeletingFiltered] = useState(false);
 
   const fetchEmailData = useCallback(async () => {
     setLoading(true);
@@ -105,6 +109,7 @@ export default function EmailTrackingPage() {
         setLogs(data.logs || []);
         setStats(data.stats || null);
         setDnsConfig(data.dnsConfig || null);
+        setTotalFiltered(data.pagination?.total ?? (data.logs || []).length);
       }
     } catch (err) {
       console.error("Failed to load email tracking data:", err);
@@ -116,6 +121,11 @@ export default function EmailTrackingPage() {
   useEffect(() => {
     fetchEmailData();
   }, [fetchEmailData]);
+
+  // Clear selections when filters change
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [search, statusFilter, categoryFilter]);
 
   async function handleSendTest(e: React.FormEvent) {
     e.preventDefault();
@@ -175,6 +185,7 @@ export default function EmailTrackingPage() {
       });
       if (res.ok) {
         if (selectedLog?.id === logId) setSelectedLog(null);
+        setSelectedIds((prev) => prev.filter((id) => id !== logId));
         fetchEmailData();
       } else {
         alert("Failed to delete email log.");
@@ -183,6 +194,60 @@ export default function EmailTrackingPage() {
       alert("Error deleting email log.");
     } finally {
       setDeletingLogId(null);
+    }
+  }
+
+  async function handleDeleteSelected() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected email record${selectedIds.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+
+    setDeletingSelected(true);
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const data = await res.json();
+      alert(data.message || `${selectedIds.length} email logs deleted.`);
+      setSelectedIds([]);
+      fetchEmailData();
+    } catch {
+      alert("Error deleting selected email logs.");
+    } finally {
+      setDeletingSelected(false);
+    }
+  }
+
+  async function handleDeleteAllFiltered() {
+    const filterDesc = [
+      search ? `matching "${search}"` : "",
+      statusFilter !== "all" ? `with status "${statusFilter}"` : "",
+      categoryFilter !== "all" ? `in category "${categoryFilter}"` : "",
+    ].filter(Boolean).join(", ") || "all";
+
+    if (!window.confirm(`Delete ALL ${totalFiltered} email record(s) ${filterDesc}? This cannot be undone.`)) return;
+
+    setDeletingFiltered(true);
+    try {
+      const res = await fetch("/api/admin/emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deleteFiltered: true,
+          search: search.trim(),
+          status: statusFilter,
+          category: categoryFilter,
+        }),
+      });
+      const data = await res.json();
+      alert(data.message || "Filtered email logs deleted.");
+      setSelectedIds([]);
+      fetchEmailData();
+    } catch {
+      alert("Error deleting filtered logs.");
+    } finally {
+      setDeletingFiltered(false);
     }
   }
 
@@ -198,6 +263,7 @@ export default function EmailTrackingPage() {
       });
       const data = await res.json();
       alert(data.message || "Failed logs cleared.");
+      setSelectedIds([]);
       fetchEmailData();
     } catch {
       alert("Error clearing failed logs.");
@@ -205,6 +271,22 @@ export default function EmailTrackingPage() {
       setClearingFailed(false);
     }
   }
+
+  const toggleSelectLog = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAllOnPage = () => {
+    if (logs.length > 0 && logs.every((l) => selectedIds.includes(l.id))) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(logs.map((l) => l.id));
+    }
+  };
+
+  const selectAllFilteredLogs = () => {
+    setSelectedIds(logs.map((l) => l.id));
+  };
 
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -432,7 +514,7 @@ export default function EmailTrackingPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar & Bulk Actions */}
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
@@ -478,6 +560,59 @@ export default function EmailTrackingPage() {
             </select>
           </div>
         </div>
+
+        {/* Bulk Selection and Batch Action Strip */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-700">
+              {selectedIds.length} of {totalFiltered} selected
+            </span>
+            {logs.length > 0 && selectedIds.length < totalFiltered && (
+              <button
+                type="button"
+                onClick={selectAllFilteredLogs}
+                className="text-xs font-semibold text-teal-800 hover:text-teal-950 underline"
+              >
+                Select all on page ({logs.length})
+              </button>
+            )}
+            {selectedIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="text-xs text-slate-500 hover:text-slate-800 underline"
+              >
+                Clear selection
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={deletingSelected}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deletingSelected ? "Deleting..." : `Delete Selected (${selectedIds.length})`}
+              </button>
+            )}
+
+            {totalFiltered > 0 && (
+              <button
+                type="button"
+                onClick={handleDeleteAllFiltered}
+                disabled={deletingFiltered}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-slate-500" />
+                {deletingFiltered ? "Deleting..." : `Delete All Filtered (${totalFiltered})`}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Sent Messages Table */}
@@ -486,6 +621,15 @@ export default function EmailTrackingPage() {
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={logs.length > 0 && logs.every((l) => selectedIds.includes(l.id))}
+                    onChange={toggleSelectAllOnPage}
+                    className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+                    title="Select/Deselect all on this page"
+                  />
+                </th>
                 <th className="px-4 py-3">Timestamp</th>
                 <th className="px-4 py-3">Recipient</th>
                 <th className="px-4 py-3">Subject</th>
@@ -498,63 +642,77 @@ export default function EmailTrackingPage() {
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                     <Inbox className="mx-auto h-8 w-8 text-slate-300" />
                     <p className="mt-2 text-sm">No email logs found matching the criteria.</p>
                   </td>
                 </tr>
               ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition">
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                      <div>{new Date(log.createdAt).toLocaleDateString()}</div>
-                      <div className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString()}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{log.recipientEmail}</div>
-                      {log.recipientName && <div className="text-[10px] text-slate-500">{log.recipientName}</div>}
-                    </td>
-                    <td className="max-w-[220px] truncate px-4 py-3 font-semibold text-slate-800" title={log.subject}>
-                      {log.subject}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                        {log.category.replace(/_/g, " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{getStatusBadge(log.status)}</td>
-                    <td className="px-4 py-3 font-mono text-[10px] text-slate-500">
-                      {log.providerMessageId ? (
-                        <span title={log.providerMessageId}>
-                          {log.providerMessageId.slice(0, 12)}...
+                logs.map((log) => {
+                  const isSelected = selectedIds.includes(log.id);
+                  return (
+                    <tr
+                      key={log.id}
+                      className={`hover:bg-slate-50 transition ${isSelected ? "bg-teal-50/50" : ""}`}
+                    >
+                      <td className="w-10 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectLog(log.id)}
+                          className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                        <div>{new Date(log.createdAt).toLocaleDateString()}</div>
+                        <div className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString()}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900">{log.recipientEmail}</div>
+                        {log.recipientName && <div className="text-[10px] text-slate-500">{log.recipientName}</div>}
+                      </td>
+                      <td className="max-w-[220px] truncate px-4 py-3 font-semibold text-slate-800" title={log.subject}>
+                        {log.subject}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                          {log.category.replace(/_/g, " ")}
                         </span>
-                      ) : (
-                        <span className="text-slate-400">n/a</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedLog(log)}
-                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          <Eye className="h-3 w-3" />
-                          Inspect
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deletingLogId === log.id}
-                          onClick={() => handleDeleteLog(log.id)}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-red-600 transition"
-                          title="Delete email record"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-3">{getStatusBadge(log.status)}</td>
+                      <td className="px-4 py-3 font-mono text-[10px] text-slate-500">
+                        {log.providerMessageId ? (
+                          <span title={log.providerMessageId}>
+                            {log.providerMessageId.slice(0, 12)}...
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">n/a</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLog(log)}
+                            className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            <Eye className="h-3 w-3" />
+                            Inspect
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingLogId === log.id}
+                            onClick={() => handleDeleteLog(log.id)}
+                            className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-red-600 transition"
+                            title="Delete email record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
