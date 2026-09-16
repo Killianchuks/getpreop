@@ -13,7 +13,7 @@ function getCleanEnv(key: string, fallback: string): string {
 
 const APP_URL = getCleanEnv("NEXT_PUBLIC_APP_URL", "https://www.getpreop.com");
 const COMPANY_NAME = "GetPreOp";
-const PHYSICAL_ADDRESS = "GetPreOp Inc., 100 Medical Center Way, Suite 400, Boston, MA 02115";
+const PHYSICAL_ADDRESS = "GetPreOp Inc., 2303 W Greenleaf Avenue, Chicago, Illinois";
 const SUPPORT_EMAIL = getCleanEnv("MAILERSEND_REPLY_TO_EMAIL", "support@getpreop.com");
 
 interface EmailLayoutOptions {
