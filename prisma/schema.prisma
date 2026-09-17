@@ -265,6 +265,7 @@ model BusinessDevelopmentContact {
   tags             String[]                      @default([])
   status           String                        @default("NEW")
   lastContactedAt  DateTime?
+  emailCount       Int                            @default(0)
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
   messages         BusinessDevelopmentMessage[]
@@ -354,6 +355,7 @@ model DemoAvailabilitySlot {
   bookedByEmail String?
   bookedByOrg String?
   notes       String?
+  meetingUrl  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

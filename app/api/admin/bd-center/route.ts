@@ -98,6 +98,20 @@ export async function GET(request: Request) {
         const hasDeliveredMessage = contact.messages.some((m) =>
           ["DELIVERED", "OPENED", "CLICKED"].includes(m.status)
         );
+        const hasOpened = contact.messages.some((m) => ["OPENED", "CLICKED"].includes(m.status));
+
+        // Segment used to target campaign messages: contacts never emailed, sent-but-unopened,
+        // opened-with-no-follow-up-action, or already qualified/converted.
+        let segment: "NEW" | "AWAITING_REPLY" | "OPENED_NO_ACTION" | "ENGAGED";
+        if (contact.status === "QUALIFIED" || contact.status === "CLIENT") {
+          segment = "ENGAGED";
+        } else if (contact.messages.length === 0) {
+          segment = "NEW";
+        } else if (hasOpened) {
+          segment = "OPENED_NO_ACTION";
+        } else {
+          segment = "AWAITING_REPLY";
+        }
 
         return {
           id: contact.id,
@@ -123,6 +137,9 @@ export async function GET(request: Request) {
           lastContactedAt: contact.lastContactedAt ? contact.lastContactedAt.toISOString() : null,
           hasSentMessage,
           hasDeliveredMessage,
+          hasOpened,
+          emailCount: contact.emailCount,
+          segment,
           messagesCount: contact.messages.length,
           lastMessageStatus: contact.messages[0]?.status ?? null,
           createdAt: contact.createdAt.toISOString(),

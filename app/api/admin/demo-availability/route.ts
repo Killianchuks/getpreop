@@ -138,6 +138,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "This time slot is no longer available. Please choose another time." }, { status: 409 });
       }
 
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.getpreop.com").replace(/\/$/, "");
+      const meetingUrl = `${appUrl}/book-demo/room/${slot.id}`;
+
       const updatedSlot = await prisma.demoAvailabilitySlot.update({
         where: { id: slotId },
         data: {
@@ -146,18 +149,19 @@ export async function POST(request: Request) {
           bookedByEmail: email.trim().toLowerCase(),
           bookedByOrg: organization ? organization.trim() : null,
           notes: notes ? notes.trim() : null,
+          meetingUrl,
         },
       });
 
-      // Send confirmation emails to the lead and admin
-      try {
-        const formattedDate = new Intl.DateTimeFormat("en-US", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        }).format(new Date(`${slot.date}T12:00:00`));
+      const formattedDate = new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date(`${slot.date}T12:00:00`));
 
+      // Send confirmation email to the lead
+      try {
         const confirmationLayout = buildDeliverableEmailLayout({
           title: "Your GetPreOp Platform Demo is Confirmed",
           preheader: `Demo scheduled with Dr. Jessica Onwudiwe for ${formattedDate} at ${slot.time}.`,
@@ -184,9 +188,15 @@ export async function POST(request: Request) {
               </table>
             </div>
 
+            <p style="margin:20px 0 8px 0;">Join the video call at your scheduled time using the link below:</p>
+            <p style="margin:0 0 16px 0;text-align:center;">
+              <a href="${meetingUrl}" class="btn" style="display:inline-block;background-color:#0f766e;color:#ffffff !important;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Join Video Call</a>
+            </p>
+            <p style="margin:0 0 16px 0;font-size:12px;color:#64748b;word-break:break-all;">Or copy this link: ${meetingUrl}</p>
+
             <p style="margin:16px 0 0 0;">We look forward to connecting and discussing how GetPreOp reduces day-of-surgery cancellations and enhances pre-op readiness for your team.</p>
           `,
-          contentText: `Hello ${name},\n\nYour 15-minute GetPreOp demo is confirmed for ${formattedDate} at ${slot.time} (CT) with Dr. Jessica Onwudiwe, MD.`,
+          contentText: `Hello ${name},\n\nYour 15-minute GetPreOp demo is confirmed for ${formattedDate} at ${slot.time} (CT) with Dr. Jessica Onwudiwe, MD.\n\nJoin the video call: ${meetingUrl}`,
           recipientEmail: email,
           showUnsubscribe: false,
           categoryNote: "This confirmation was generated from your GetPreOp demo request.",
@@ -203,6 +213,66 @@ export async function POST(request: Request) {
         });
       } catch (emailErr) {
         console.error("Failed to dispatch demo confirmation email:", emailErr);
+      }
+
+      // Send new-booking alert email to the admin/host
+      try {
+        const adminEmail = (process.env.ADMIN_NOTIFICATION_EMAIL || process.env.MAILERSEND_REPLY_TO_EMAIL || "contact@getpreop.com").trim();
+        const hostMeetingUrl = `${meetingUrl}?role=host`;
+
+        const adminLayout = buildDeliverableEmailLayout({
+          title: "New GetPreOp Demo Booked",
+          preheader: `${name} booked a demo for ${formattedDate} at ${slot.time}.`,
+          contentHtml: `
+            <h2 style="font-size:18px;font-weight:700;color:#0f172a;margin-top:0;margin-bottom:12px;">New Demo Booking</h2>
+            <p style="margin:0 0 16px 0;">A new demo walkthrough has been booked on the GetPreOp calendar.</p>
+
+            <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
+              <table role="presentation" border="0" cellpadding="4" cellspacing="0" width="100%" style="font-size:14px;">
+                <tr>
+                  <td style="width:120px;color:#64748b;font-weight:600;">Name:</td>
+                  <td style="color:#0f172a;font-weight:700;">${name}</td>
+                </tr>
+                <tr>
+                  <td style="color:#64748b;font-weight:600;">Email:</td>
+                  <td style="color:#0f172a;">${email}</td>
+                </tr>
+                ${organization ? `<tr><td style="color:#64748b;font-weight:600;">Organization:</td><td style="color:#0f172a;">${organization}</td></tr>` : ""}
+                ${notes ? `<tr><td style="color:#64748b;font-weight:600;">Notes:</td><td style="color:#0f172a;">${notes}</td></tr>` : ""}
+                <tr>
+                  <td style="color:#64748b;font-weight:600;">Date:</td>
+                  <td style="color:#0f172a;font-weight:700;">${formattedDate}</td>
+                </tr>
+                <tr>
+                  <td style="color:#64748b;font-weight:600;">Time:</td>
+                  <td style="color:#0f172a;font-weight:700;">${slot.time} (US Central Time / CT)</td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="margin:20px 0 8px 0;">Join the video call as host using the link below:</p>
+            <p style="margin:0 0 16px 0;text-align:center;">
+              <a href="${hostMeetingUrl}" class="btn" style="display:inline-block;background-color:#0f766e;color:#ffffff !important;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Join as Host</a>
+            </p>
+            <p style="margin:0 0 0 0;font-size:12px;color:#64748b;word-break:break-all;">Or copy this link: ${hostMeetingUrl}</p>
+          `,
+          contentText: `New demo booking:\n\nName: ${name}\nEmail: ${email}\n${organization ? `Organization: ${organization}\n` : ""}${notes ? `Notes: ${notes}\n` : ""}Date: ${formattedDate}\nTime: ${slot.time} (CT)\n\nJoin as host: ${hostMeetingUrl}`,
+          recipientEmail: adminEmail,
+          showUnsubscribe: false,
+          categoryNote: "This is an internal notification for a new GetPreOp demo booking.",
+        });
+
+        await sendDeliverableEmail({
+          to: adminEmail,
+          toName: "GetPreOp Team",
+          subject: `New Demo Booked: ${name} on ${formattedDate} at ${slot.time}`,
+          html: adminLayout.html,
+          text: adminLayout.text,
+          category: "NOTIFICATION",
+          metadata: { demoBookingId: slot.id, slotDate: slot.date, slotTime: slot.time, leadEmail: email },
+        });
+      } catch (emailErr) {
+        console.error("Failed to dispatch demo admin alert email:", emailErr);
       }
 
       return NextResponse.json({ success: true, slot: updatedSlot, message: "Demo scheduled successfully!" });

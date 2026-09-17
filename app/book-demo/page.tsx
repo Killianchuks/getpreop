@@ -32,6 +32,7 @@ interface Slot {
   bookedByName?: string | null;
   bookedByEmail?: string | null;
   bookedByOrg?: string | null;
+  meetingUrl?: string | null;
 }
 
 export default function BookDemoPage() {
@@ -174,6 +175,14 @@ export default function BookDemoPage() {
             </div>
 
             <div className="mt-8 flex justify-center gap-3">
+              {bookingSuccess.meetingUrl && (
+                <a
+                  href={bookingSuccess.meetingUrl}
+                  className="rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-600 transition"
+                >
+                  Join Video Call
+                </a>
+              )}
               <Link
                 href="/"
                 className="rounded-lg bg-teal-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-900 transition"

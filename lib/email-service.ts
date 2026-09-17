@@ -506,6 +506,7 @@ export async function sendDeliverableBulkEmails(items: BulkSendItem[]): Promise<
             data: {
               status: "CONTACTED",
               lastContactedAt: new Date(),
+              emailCount: { increment: 1 },
             },
           });
         }
@@ -587,6 +588,22 @@ export async function sendDeliverableBulkEmails(items: BulkSendItem[]): Promise<
         providerMessageId: `mock_bulk_${Date.now()}`,
         sentAt: new Date(),
       },
+    });
+  }
+
+  const mockBdIds = preparedItems.map((p) => p.item.bdMessageId).filter((id): id is string => Boolean(id));
+  if (mockBdIds.length > 0) {
+    await prisma.businessDevelopmentMessage.updateMany({
+      where: { id: { in: mockBdIds } },
+      data: { status: "SENT", providerMessageId: `mock_bulk_${Date.now()}`, sentAt: new Date(), errorMessage: null },
+    });
+  }
+
+  const mockContactIds = preparedItems.map((p) => p.item.contactId).filter((id): id is string => Boolean(id));
+  if (mockContactIds.length > 0) {
+    await prisma.businessDevelopmentContact.updateMany({
+      where: { id: { in: mockContactIds } },
+      data: { status: "CONTACTED", lastContactedAt: new Date(), emailCount: { increment: 1 } },
     });
   }
 

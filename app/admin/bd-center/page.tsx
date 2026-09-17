@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { CAMPAIGN_TEMPLATES, type ContactSegment } from "@/lib/campaign-templates";
 
 interface ContactRecord {
   id: string;
@@ -28,10 +29,20 @@ interface ContactRecord {
   lastContactedAt?: string | null;
   hasSentMessage?: boolean;
   hasDeliveredMessage?: boolean;
+  hasOpened?: boolean;
+  emailCount?: number;
+  segment?: ContactSegment;
   messagesCount?: number;
   lastMessageStatus?: string | null;
   createdAt: string;
 }
+
+const SEGMENT_LABELS: Record<ContactSegment, string> = {
+  NEW: "Never emailed",
+  AWAITING_REPLY: "Sent, not opened",
+  OPENED_NO_ACTION: "Opened, no action",
+  ENGAGED: "Qualified / client",
+};
 
 const defaultMessage = {
   subject: "Introduction to GetPreOp partnership",
@@ -63,6 +74,8 @@ export default function BDCenterPage() {
   const [emailFilter, setEmailFilter] = useState("all");
   const [phoneFilter, setPhoneFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [segmentFilter, setSegmentFilter] = useState<ContactSegment | "all">("all");
+  const [campaignId, setCampaignId] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [replaceExisting, setReplaceExisting] = useState(true);
@@ -110,9 +123,21 @@ export default function BDCenterPage() {
       const matchesEmail = emailFilter === "all" || (emailFilter === "present" ? hasEmail : !hasEmail);
       const matchesPhone = phoneFilter === "all" || (phoneFilter === "present" ? hasPhone : !hasPhone);
       const matchesRole = roleFilter === "all" || (roleFilter === "doctor" ? isDoctorContact(contact) : !isDoctorContact(contact));
-      return matchesSearch && matchesState && matchesStatus && matchesOrganization && matchesEmail && matchesPhone && matchesRole;
+      const matchesSegment = segmentFilter === "all" || contact.segment === segmentFilter;
+      return matchesSearch && matchesState && matchesStatus && matchesOrganization && matchesEmail && matchesPhone && matchesRole && matchesSegment;
     });
-  }, [contacts, search, stateFilter, statusFilter, organizationFilter, emailFilter, phoneFilter, roleFilter]);
+  }, [contacts, search, stateFilter, statusFilter, organizationFilter, emailFilter, phoneFilter, roleFilter, segmentFilter]);
+
+  function applyCampaign(id: string) {
+    setCampaignId(id);
+    if (!id) return;
+    const campaign = CAMPAIGN_TEMPLATES.find((item) => item.id === id);
+    if (!campaign) return;
+    setMessageSubject(campaign.subject);
+    setMessageBody(campaign.body);
+    setSegmentFilter(campaign.targetSegment === "ALL" ? "all" : campaign.targetSegment);
+    setSelectedIds([]);
+  }
 
   // Compute final recipients after applying exclusion filters and manual exclusions
   const activeRecipients = useMemo(() => {
@@ -585,6 +610,15 @@ export default function BDCenterPage() {
                 <option value="CLIENT">Client</option>
               </select>
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Outreach segment</label>
+              <select value={segmentFilter} onChange={(event) => setSegmentFilter(event.target.value as ContactSegment | "all")} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value="all">All segments</option>
+                {(Object.keys(SEGMENT_LABELS) as ContactSegment[]).map((segment) => (
+                  <option key={segment} value={segment}>{SEGMENT_LABELS[segment]}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </aside>
 
@@ -725,6 +759,20 @@ export default function BDCenterPage() {
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Campaign template</label>
+                <select value={campaignId} onChange={(event) => applyCampaign(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <option value="">Custom message</option>
+                  {CAMPAIGN_TEMPLATES.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>{campaign.label}</option>
+                  ))}
+                </select>
+                {campaignId && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {CAMPAIGN_TEMPLATES.find((c) => c.id === campaignId)?.description}
+                  </p>
+                )}
+              </div>
+              <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email subject</label>
                 <input value={messageSubject} onChange={(event) => setMessageSubject(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
               </div>
@@ -776,6 +824,7 @@ export default function BDCenterPage() {
                     <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Greeting</th>
                     <th className="px-4 py-3">Outreach / Delivery</th>
+                    <th className="px-4 py-3">Emails sent</th>
                     <th className="px-4 py-3">Corporate phone</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Email</th>
@@ -783,7 +832,7 @@ export default function BDCenterPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Loading contacts…</td></tr> : filteredContacts.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No contacts match the current filters.</td></tr> : filteredContacts.map((contact) => {
+                  {loading ? <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">Loading contacts…</td></tr> : filteredContacts.length === 0 ? <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">No contacts match the current filters.</td></tr> : filteredContacts.map((contact) => {
                     const isManuallyExcluded = excludedIds.includes(contact.id);
                     const isAutoExcluded = !activeRecipients.some((r) => r.id === contact.id);
 
@@ -824,7 +873,11 @@ export default function BDCenterPage() {
                               Unsent
                             </span>
                           )}
+                          {contact.segment && (
+                            <span className="mt-1 block text-[10px] font-semibold text-slate-500">{SEGMENT_LABELS[contact.segment]}</span>
+                          )}
                         </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-700">{contact.emailCount ?? 0}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{contact.corporatePhone ?? contact.phone ?? "No phone"}</td>
                         <td className="px-4 py-3">
                           <select value={contact.status} onChange={(event) => void updateContactStatus(contact.id, event.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
