@@ -25,6 +25,8 @@ export default async function DemoVideoRoomPage({
       patientName={slot.bookedByName || "Guest"}
       physicianName="Dr. Jessica Onwudiwe, MD"
       backHref="/book-demo"
+      attendeeLabel="Guest"
+      visitType="Product demo"
     />
   );
 }
