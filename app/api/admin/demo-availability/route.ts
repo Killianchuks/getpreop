@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 
     // 2. Admin recurring slots generator
     if (action === "apply_recurring") {
-      const { startDate, endDate, days, times } = body;
+      const { startDate, endDate, days, times, replaceExisting } = body;
       if (!startDate || !endDate || !Array.isArray(days) || !Array.isArray(times)) {
         return NextResponse.json({ error: "Missing recurring schedule parameters." }, { status: 400 });
       }
@@ -97,6 +97,16 @@ export async function POST(request: Request) {
         Fri: 5,
         Sat: 6,
       };
+
+      // Clear stale unbooked slots left over from a prior generation so the new
+      // day/time selection fully replaces the old one instead of merging with it.
+      let removed = 0;
+      if (replaceExisting) {
+        const deleted = await prisma.demoAvailabilitySlot.deleteMany({
+          where: { date: { gte: startDate, lte: endDate }, isBooked: false },
+        });
+        removed = deleted.count;
+      }
 
       const targetDayIndices = new Set(days.map((d: string) => weekdayMap[d]).filter((d) => d !== undefined));
       const start = new Date(`${startDate}T12:00:00`);
@@ -123,7 +133,14 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json({ success: true, count: created, message: `Created recurring slots.` });
+      return NextResponse.json({
+        success: true,
+        count: created,
+        removed,
+        message: replaceExisting
+          ? `Replaced availability in range: removed ${removed} old open slot(s), created ${created} new slot(s).`
+          : `Created ${created} recurring slot(s).`,
+      });
     }
 
     // 3. User / Partner Book a Slot

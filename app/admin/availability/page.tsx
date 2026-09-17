@@ -63,6 +63,7 @@ export default function AdminAvailabilityPage() {
   const [selectedRecurringTimes, setSelectedRecurringTimes] = useState<string[]>([
     "9:00 AM", "10:00 AM", "1:00 PM", "2:00 PM", "3:00 PM"
   ]);
+  const [replaceExistingRecurring, setReplaceExistingRecurring] = useState(true);
 
   async function fetchSlots() {
     setLoading(true);
@@ -158,6 +159,7 @@ export default function AdminAvailabilityPage() {
           endDate: recurringEnd,
           days: selectedRecurringDays,
           times: selectedRecurringTimes,
+          replaceExisting: replaceExistingRecurring,
         }),
       });
 
@@ -473,7 +475,16 @@ export default function AdminAvailabilityPage() {
           </div>
         </div>
 
-        <div className="mt-5 border-t border-slate-100 pt-4 flex justify-end">
+        <div className="mt-5 border-t border-slate-100 pt-4 flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={replaceExistingRecurring}
+              onChange={(e) => setReplaceExistingRecurring(e.target.checked)}
+              className="rounded border-slate-300 text-teal-800 focus:ring-teal-700"
+            />
+            Replace existing open availability in this date range
+          </label>
           <button
             type="button"
             disabled={saving}
