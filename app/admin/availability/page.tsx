@@ -203,7 +203,7 @@ export default function AdminAvailabilityPage() {
   }).format(new Date(`${selectedDate}T12:00:00`));
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="w-full max-w-none px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

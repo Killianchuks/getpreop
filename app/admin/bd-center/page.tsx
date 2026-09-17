@@ -508,7 +508,7 @@ export default function BDCenterPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-8">
+    <main className="w-full max-w-none px-5 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-800">Business development</p>

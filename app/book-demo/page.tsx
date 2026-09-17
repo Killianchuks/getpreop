@@ -53,6 +53,7 @@ export default function BookDemoPage() {
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<Slot | null>(null);
+  const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function fetchSlots() {
@@ -102,6 +103,11 @@ export default function BookDemoPage() {
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address (e.g. name@company.com).");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -125,6 +131,7 @@ export default function BookDemoPage() {
       }
 
       setBookingSuccess(data.slot || selectedSlot);
+      setEmailWarning(data.confirmationEmailSent === false ? data.message : null);
       fetchSlots();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error booking demo.");
@@ -166,6 +173,12 @@ export default function BookDemoPage() {
             <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto">
               A calendar invite and meeting details have been emailed to <strong>{email}</strong>.
             </p>
+
+            {emailWarning && (
+              <p className="mx-auto mt-4 max-w-md rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-800">
+                {emailWarning}
+              </p>
+            )}
 
             <div className="mx-auto mt-6 max-w-sm rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-left text-xs text-slate-700">
               <p><strong>Host:</strong> Dr. Jessica Onwudiwe, MD</p>

@@ -132,6 +132,9 @@ export async function POST(request: Request) {
       if (!slotId || !name || !email) {
         return NextResponse.json({ error: "Please provide your name and email to confirm the booking." }, { status: 400 });
       }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+        return NextResponse.json({ error: "Please provide a valid email address (e.g. name@company.com)." }, { status: 400 });
+      }
 
       const slot = await prisma.demoAvailabilitySlot.findUnique({ where: { id: slotId } });
       if (!slot || slot.isBooked) {
@@ -161,6 +164,7 @@ export async function POST(request: Request) {
       }).format(new Date(`${slot.date}T12:00:00`));
 
       // Send confirmation email to the lead
+      let confirmationEmailSent = true;
       try {
         const confirmationLayout = buildDeliverableEmailLayout({
           title: "Your GetPreOp Platform Demo is Confirmed",
@@ -202,7 +206,7 @@ export async function POST(request: Request) {
           categoryNote: "This confirmation was generated from your GetPreOp demo request.",
         });
 
-        await sendDeliverableEmail({
+        const result = await sendDeliverableEmail({
           to: email,
           toName: name,
           subject: `Confirmed: GetPreOp Demo on ${formattedDate} at ${slot.time}`,
@@ -211,7 +215,9 @@ export async function POST(request: Request) {
           category: "NOTIFICATION",
           metadata: { demoBookingId: slot.id, slotDate: slot.date, slotTime: slot.time },
         });
+        confirmationEmailSent = result.success;
       } catch (emailErr) {
+        confirmationEmailSent = false;
         console.error("Failed to dispatch demo confirmation email:", emailErr);
       }
 
@@ -275,7 +281,14 @@ export async function POST(request: Request) {
         console.error("Failed to dispatch demo admin alert email:", emailErr);
       }
 
-      return NextResponse.json({ success: true, slot: updatedSlot, message: "Demo scheduled successfully!" });
+      return NextResponse.json({
+        success: true,
+        slot: updatedSlot,
+        confirmationEmailSent,
+        message: confirmationEmailSent
+          ? "Demo scheduled successfully!"
+          : "Demo scheduled, but we couldn't send the confirmation email to that address. Please double-check it and contact us if you don't hear back.",
+      });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

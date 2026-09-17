@@ -14,7 +14,7 @@ export default async function BDContactDetailPage({ params }: { params: Promise<
   if (!contact) notFound();
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-8">
+    <main className="w-full max-w-none px-5 py-8">
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-800">BD center</p>
